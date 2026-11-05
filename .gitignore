@@ -1,0 +1,11 @@
+# build output and downloaded tools
+build/
+dist/
+tools/bin/
+android/build/
+android/assets/index.html
+tools/mock-songhub/node_modules/
+# never commit signing keys
+*.jks
+*.keystore
+*.idsig

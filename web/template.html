@@ -1,0 +1,1018 @@
+<title>Karaoke Songbook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#2a1f4d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one-screen app — stage-coloured header (search + mode + letter strip), virtualised song list below; table columns on wide/landscape, two-line rows on phones */
+:root{
+  --bg:#f3f1f8; --surface:#ffffff; --fg:#1d1830; --muted:#6a6385; --line:#e2ddef;
+  --stage:#2a1f4d; --stage-fg:#f4f0ff; --stage-muted:#b9b0d9; --stage-2:#3a2d66;
+  --accent:#e2337a; --accent-fg:#ffffff; --num:#2d6f73; --num-bg:#e3f2f1; --hl:#fff1b8; --ok:#2f9e5b; --warn:#c77d12;
+  --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"Roboto Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141020; --surface:#1c1730; --fg:#ece8f8; --muted:#a39cbf; --line:#2d2645;
+  --stage:#1f1838; --stage-fg:#f4f0ff; --stage-muted:#a79dcc; --stage-2:#30265a;
+  --accent:#ff5c9a; --accent-fg:#1a0a12; --num:#7fd6d0; --num-bg:#16302f; --hl:#4a3f12; --ok:#5fd38d; --warn:#f0b049; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141020; --surface:#1c1730; --fg:#ece8f8; --muted:#a39cbf; --line:#2d2645;
+  --stage:#1f1838; --stage-fg:#f4f0ff; --stage-muted:#a79dcc; --stage-2:#30265a;
+  --accent:#ff5c9a; --accent-fg:#1a0a12; --num:#7fd6d0; --num-bg:#16302f; --hl:#4a3f12; --ok:#5fd38d; --warn:#f0b049; color-scheme:dark}
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--stage)}
+.app{height:100%;display:flex;flex-direction:column;min-height:0}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+.stage{background:var(--stage);color:var(--stage-fg)}
+/* portrait: one column; the two halves dissolve and their parts stack in this order */
+.side,.main{display:contents}
+.top{order:1}.srow{order:2}.modes{order:3}.letters{order:4}.np{order:5}.bar{order:6}.thead{order:7}.list{order:8}
+.top,.srow,.modes,.letters{flex:none}
+.srow{padding-block:0 10px;display:flex;gap:8px;align-items:stretch}
+.srow .search{flex:1 1 auto}
+.kpbtn{flex:none;width:52px;display:grid;place-items:center;border-radius:12px;border:1.5px solid transparent;background:var(--stage-2);color:var(--stage-fg);cursor:pointer;padding:0}
+.kpbtn svg{width:24px;height:24px;fill:currentColor}
+.kpbtn:active{transform:scale(.94)}
+.kpbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* number keypad */
+.card.kpcard{max-width:460px}
+.kp{display:flex;flex-direction:column;gap:12px}
+.kpleft,.kpright,.kpacts{display:flex;flex-direction:column;gap:12px;min-width:0}
+.kpacts .acts button{flex:1 1 30%}
+.kpdisp{font-family:var(--f-num);font-weight:700;font-size:clamp(2.4rem,12vw,3.4rem);letter-spacing:.12em;text-align:center;color:var(--num);background:var(--num-bg);border-radius:14px;padding:10px 6px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpdisp .ph{opacity:.35}
+.kpsong{min-height:2.9em;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.kpsong b{font-family:var(--f-display);font-size:1.15rem;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kpsong span{color:var(--muted);font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpgrid button{height:clamp(46px,7.5vh,60px);border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-family:var(--f-num);font-weight:700;font-size:1.5rem;cursor:pointer}
+.kpgrid button:active{transform:scale(.95);background:var(--line)}
+.kpgrid .kclr{color:var(--accent);font-size:1rem;font-family:var(--f-body)}
+.kpgrid .kdel svg{width:26px;height:26px;fill:currentColor}
+.kp .acts button:disabled{opacity:.45;cursor:default}
+@media (orientation:landscape) and (max-height:640px){
+  .card.kpcard{max-width:780px}
+  .kp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"disp keys" "acts keys";grid-template-rows:auto 1fr;gap:12px 16px;align-items:start}
+  .kpleft{grid-area:disp;gap:8px}.kpright{grid-area:keys}.kpacts{grid-area:acts}
+  .kpcard{padding-block:16px calc(16px + env(safe-area-inset-bottom,0px))}
+  .kpdisp{font-size:clamp(1.8rem,10vh,2.8rem);padding:6px}
+  .kpsong{min-height:0}
+  .kpacts .acts{gap:8px}.kpacts .acts button{padding:9px 10px;flex:1 1 40%}
+  .kpgrid{gap:6px}.kpgrid button{height:clamp(38px,11.5vh,54px)}
+}
+/* phone in landscape: controls on the left half, search + songs on the right */
+@media (orientation:landscape) and (max-height:640px){
+  .app{flex-direction:row}
+  .side{display:flex;flex-direction:column;flex:none;width:min(50%,540px);overflow-y:auto;overscroll-behavior:contain;background:var(--stage);border-right:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .main{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0}
+  .srow{padding-block:10px}
+  .brand small{display:none}
+  /* title row stays visible while the left side scrolls */
+  .side .top{position:sticky;top:0;z-index:3;padding-block:8px}
+  /* letters: one swipeable line, bigger */
+  .side .letters{flex-wrap:nowrap;overflow-x:auto;gap:4px;padding-block:0 8px}
+  .side .letters button{flex:none;min-width:46px;height:46px;font-size:1.15rem;border-radius:11px}
+  /* song-playing / queue line and control buttons: larger */
+  .side .np{border-top:1px solid var(--line);border-bottom:0;flex:1 0 auto}
+  .side .npinfo{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;row-gap:3px;align-items:center;padding-block:8px}
+  .side .np .st{display:block;grid-column:1;grid-row:1;font-size:.75rem}
+  .side .np .t{grid-column:1;grid-row:2;font-size:1.05rem;white-space:normal;overflow:visible;line-height:1.25}
+  .side .np .t .tt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:700}
+  .side .np .t small{display:block;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .side .np .qc{grid-column:2;grid-row:1/3}
+  /* Keys / Tempo / Melody choices pop up above the controls so they stay on screen */
+  .side .np{position:relative}
+  .side .panel{position:absolute;left:0;right:0;bottom:100%;z-index:4;background:var(--surface);border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -10px 24px rgba(10,6,24,.28);padding-block:12px 10px}
+  .side .np .qc{font-size:1rem;padding:6px 12px}
+  .side .np .qc svg{width:18px;height:18px}
+  .side .ctl{gap:6px;padding-block:0 10px}
+  .side .ctl button{min-height:clamp(60px,18vh,92px);gap:3px;border-radius:14px;padding-block:5px}
+  .side .ctl button svg{width:26px;height:26px}
+  .side .ctl button .v{font-size:calc(1.25rem * var(--fs,1))}
+  .side .ctl button span{font-size:calc(.78rem * var(--fs,1));overflow:hidden;text-overflow:clip}
+}
+.top{display:flex;align-items:center;gap:8px 12px;padding-block:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:1.35rem;margin:0;letter-spacing:-.01em;white-space:nowrap}
+.wordmark{border:0;background:none;padding:0;margin:0;color:inherit;cursor:pointer;display:inline-flex;align-items:center}
+.wordmark:active h1{opacity:.7}
+.wordmark:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.about{display:flex;flex-direction:column;gap:14px}
+.about h2{font-family:var(--f-display);font-weight:800;font-size:1.6rem;margin:0}
+.about .ver{color:var(--muted);font-family:var(--f-num);font-size:.9rem;margin-top:4px}
+.about p{margin:0;line-height:1.5}
+.about .credit{padding:12px 14px;border-radius:12px;background:var(--num-bg);color:var(--fg);line-height:1.5}
+.about .credit b{color:var(--num)}
+.about .owner{font-weight:700;font-size:1.05rem;color:var(--fg)}
+.about p:not(.owner){color:var(--fg)}
+.brand small{color:var(--stage-muted);font-size:.8rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.search{display:block;position:relative;min-width:0}
+.search input{width:100%;box-sizing:border-box;font:inherit;font-size:1rem;padding:11px 40px 11px 40px;border-radius:12px;border:1.5px solid transparent;background:var(--stage-2);color:var(--stage-fg);outline:none}
+.search input::placeholder{color:var(--stage-muted)}
+.search input:focus{border-color:var(--accent)}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;stroke:var(--stage-muted);fill:none;stroke-width:2}
+.search button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--stage-muted);font-size:1.3rem;width:32px;height:32px;border-radius:8px;cursor:pointer}
+
+.modes{display:flex;gap:6px;padding-block:0 10px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;overscroll-behavior-x:contain;scroll-padding-inline:16px}
+.modes::-webkit-scrollbar{display:none}
+.modes.more-r{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
+.modes.more-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 36px);mask-image:linear-gradient(90deg,transparent,#000 36px)}
+.modes.more-l.more-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent)}
+.modes button{flex:1 0 auto;max-width:200px;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;font:inherit;font-weight:700;font-size:.92rem;padding:9px 16px;border-radius:10px;border:0;background:var(--stage-2);color:var(--stage-muted);cursor:pointer}
+.modes .msort{color:var(--stage-fg);border:1.5px dashed var(--stage-muted);background:transparent}
+.modes .msort #sortl{font-family:var(--f-num)}
+.modes button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.modes button:focus-visible,.letters button:focus-visible,.row:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.letters{display:flex;gap:4px;overflow-x:auto;padding-block:0 12px;scrollbar-width:none}
+.letters::-webkit-scrollbar{display:none}
+.letters button{flex:none;min-width:38px;height:38px;font-family:var(--f-num);font-weight:700;font-size:.9rem;border-radius:9px;border:0;background:transparent;color:var(--stage-fg);cursor:pointer;padding:0 8px}
+.letters button.dim{color:var(--stage-muted);opacity:.45}
+.letters button[aria-pressed="true"]{background:var(--stage-fg);color:var(--stage)}
+
+.bar{flex:none;display:flex;align-items:center;gap:10px;padding-block:10px;border-bottom:1px solid var(--line);background:var(--bg);min-height:24px}
+.bar .crumb{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .count{color:var(--muted);font-size:.88rem;font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap}
+.sortb{flex:none;display:inline-flex;align-items:center;gap:5px;font:inherit;font-weight:700;font-size:.82rem;padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;white-space:nowrap}
+.sortb svg{width:15px;height:15px;fill:currentColor}
+.cat-inline.when,.cat.when{border-color:transparent;padding-left:0}
+.back{font:inherit;font-weight:700;font-size:.88rem;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:9px;padding:6px 12px;cursor:pointer;flex:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font:inherit;font-size:.88rem;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:6px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip span{color:var(--muted);font-weight:400;margin-left:4px}
+.chip[aria-pressed="true"] span{color:inherit;opacity:.7}
+
+.thead{flex:none;display:none;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;padding-block:8px;border-bottom:1px solid var(--line)}
+.list{flex:1 1 auto;overflow-y:auto;position:relative;min-height:0;overscroll-behavior:contain}
+.spacer{position:relative;width:100%}
+.row{position:absolute;left:0;right:0;box-sizing:border-box;display:grid;align-items:center;cursor:pointer;border-bottom:1px solid var(--line)}
+.row:active{background:var(--line)}
+
+/* phone rows: number | title over artist */
+.row{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:12px;height:var(--rh)}
+.row .num{grid-column:1}.row .title,.row .artist{grid-column:2}
+.fav{grid-column:3;grid-row:1/3;width:44px;height:44px;margin-right:-8px;display:grid;place-items:center;border:0;background:none;border-radius:50%;cursor:pointer;color:var(--muted);padding:0}
+.fav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2}
+.fav[aria-pressed="true"]{color:var(--accent)}
+.fav[aria-pressed="true"] svg{fill:currentColor}
+.fav:active{transform:scale(.88)}
+.fav:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.mh{display:inline-flex}.mh svg{width:15px;height:15px;fill:currentColor}
+.fc{font-size:.75rem;font-variant-numeric:tabular-nums;opacity:.85}
+.fc:not(:empty)::before{content:"· "}
+
+.cardtop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.favbig{flex:none;display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:700;font-size:.85rem;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.favbig svg{width:18px;height:18px;fill:none;stroke:var(--accent);stroke-width:2}
+.favbig[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.favbig[aria-pressed="true"] svg{fill:var(--accent)}
+.toast button{font:inherit;font-weight:700;margin-left:12px;padding:4px 10px;border-radius:8px;border:1px solid currentColor;background:none;color:inherit;cursor:pointer}
+.num{grid-row:1/3;font-family:var(--f-num);font-weight:700;font-size:1rem;color:var(--num);background:var(--num-bg);border-radius:8px;text-align:center;padding:7px 9px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.title{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:end}
+.artist{color:var(--muted);font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:start}
+.cat{display:none}
+.artist .cat-inline{font-size:.75rem;border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:6px;color:var(--muted)}
+mark{background:var(--hl);color:inherit;border-radius:2px}
+
+/* wide rows: table columns */
+.app.wide .thead{display:grid}
+.app.wide .thead,.app.wide .row{grid-template-columns:6.6rem minmax(0,2.2fr) minmax(0,1.5fr) 110px 44px;column-gap:16px}
+.app.wide .row .num,.app.wide .row .title,.app.wide .row .artist,.app.wide .row .cat,.app.wide .row .fav{grid-column:auto;grid-row:auto}
+.app.wide .fav{margin-right:0}
+.app.wide .row{grid-template-rows:auto}
+.app.wide .num{grid-row:auto;padding:5px 0}
+.app.wide .title,.app.wide .artist{align-self:center}
+.app.wide .artist{font-size:.95rem}
+.app.wide .cat{display:block;font-size:.85rem;color:var(--muted)}
+.app.wide .cat-inline{display:none}
+@media (min-width:720px){.brand h1{font-size:1.5rem}}
+
+.arow{position:absolute;left:0;right:0;box-sizing:border-box;display:flex;align-items:center;gap:12px;height:var(--rh);border-bottom:1px solid var(--line);cursor:pointer}
+.arow .ini{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;background:var(--num-bg);color:var(--num)}
+.arow .an{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.arow .ac{color:var(--muted);font-size:.88rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.arow:active{background:var(--line)}
+
+.empty{padding:48px 16px;text-align:center;color:var(--muted)}
+
+/* number sheet */
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(10,6,24,.55);display:flex;align-items:flex-end;justify-content:center}
+.card{background:var(--surface);color:var(--fg);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:22px max(20px,env(safe-area-inset-right,0px)) calc(22px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+@media (min-width:720px){.sheet{align-items:center}.card{border-radius:20px}}
+.card .lbl{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.big{font-family:var(--f-num);font-weight:700;font-size:clamp(3rem,15vw,5rem);line-height:1;color:var(--num);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.card h2{font-family:var(--f-display);font-weight:800;font-size:1.5rem;margin:0;text-wrap:balance}
+.card p{margin:0;color:var(--muted)}
+.card .acts{display:flex;gap:10px;flex-wrap:wrap}
+.card .acts button{font:inherit;font-weight:700;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;flex:1 1 140px}
+.card .acts .primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.card{max-height:88%;overflow-y:auto}
+.conn{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:700;font-size:.78rem;padding:5px 10px;line-height:1.2;border-radius:999px;border:1.5px solid var(--stage-2);background:transparent;color:var(--stage-fg);cursor:pointer;white-space:nowrap}
+.conn .dot{width:8px;height:8px;border-radius:50%;background:var(--stage-muted)}
+.conn[data-s="on"]{border-color:var(--ok);}
+.conn[data-s="on"] .dot{background:var(--ok)}
+.conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{background:var(--warn)}
+@media (prefers-reduced-motion:no-preference){.conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}}
+.np{flex:none;display:flex;flex-direction:column;width:100%;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.ctl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding-block:0 8px}
+.ctl button{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 2px;min-height:54px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;cursor:pointer}
+.ctl button span{font-size:calc(.7rem * var(--fs,1));font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ctl button .v{font-family:var(--f-num);font-size:calc(1rem * var(--fs,1));line-height:1.1;color:var(--num);white-space:nowrap;max-width:100%;overflow:hidden}
+.ctl button svg{width:20px;height:20px;fill:currentColor}
+.ctl button.pp{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.ctl button.pp span{color:inherit;opacity:.85}
+.ctl button[aria-expanded="true"]{border-color:var(--num);background:var(--num-bg)}
+.ctl button:active{transform:scale(.95)}
+.ctl button:focus-visible,.panel button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:2px 10px}
+.panel .pl{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:1 1 auto}
+.panel output{min-width:3ch;text-align:center;font-family:var(--f-num);font-weight:700;font-size:1.3rem;color:var(--num);font-variant-numeric:tabular-nums}
+.sbtn{width:48px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;font-size:1.4rem;font-weight:700;cursor:pointer;line-height:1}
+.pdone{font:inherit;font-weight:700;font-size:.88rem;padding:10px 14px;border-radius:12px;border:0;background:var(--fg);color:var(--bg);cursor:pointer}
+.panel.mel .pl{flex-basis:100%}
+.mchips{flex:1 1 100%;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.mchips .chip{padding:10px 0;font-family:var(--f-num);text-align:center}
+.pfoot{flex-basis:100%;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.plink{font:inherit;font-size:.85rem;border:0;background:none;color:var(--muted);text-decoration:underline;cursor:pointer;padding:6px 0}
+@media (max-width:380px){.ctl{gap:4px}.ctl button span{font-size:calc(.62rem * var(--fs,1))}}
+.npinfo{width:100%;box-sizing:border-box;min-width:0;display:flex;align-items:center;gap:10px;font:inherit;text-align:left;border:0;background:none;color:inherit;padding-block:9px;cursor:pointer}
+.tp{flex:none;display:flex;gap:4px}
+.tp button{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer;padding:0}
+.tp button svg{width:20px;height:20px;fill:currentColor}
+.tp button.pp{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.tp button:active{transform:scale(.94)}
+.tp button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tp.big{justify-content:center;gap:12px}
+.tp.big button{width:60px;height:60px;border-radius:16px}
+.tp.big button svg{width:26px;height:26px}
+.tp.big button.pp{width:76px}
+@media (max-width:719px){.brand small{display:none}}
+@media (max-width:560px){.np .st{display:none}.np .t small{display:block;font-size:.8rem}.np .t{line-height:1.25}}
+@media (max-width:380px){.tp button{width:38px;height:38px}.np .qc{padding:4px 8px}}
+.np .st{flex:none;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.np .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np .t small{color:var(--muted);font-size:.85rem}
+.np .qc{flex:none;display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:.85rem;background:var(--num-bg);color:var(--num);padding:4px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:.8rem;font-weight:700;color:var(--muted)}
+.field input{font-family:var(--f-num);font-size:1.15rem;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);outline:none;width:100%;box-sizing:border-box}
+.field input:focus{border-color:var(--accent)}
+.kstat{font-weight:700;color:var(--fg)}
+.kstat[data-s="on"]{color:var(--ok)}
+.kstat[data-s="retry"],.kstat[data-s="error"]{color:var(--warn)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
+.seg button{font:inherit;font-weight:700;font-size:.9rem;padding:9px 8px;border-radius:9px;border:0;background:none;color:var(--muted);cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(10,6,24,.15)}
+.btbox,.wifibox{display:flex;flex-direction:column;gap:14px}
+.btbox[hidden],.wifibox[hidden]{display:none!important}
+.scan{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sst{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.92rem}
+.sbtn2{font:inherit;font-weight:700;font-size:.85rem;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;flex:none}
+.sbtn2:disabled{opacity:.5;cursor:default}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.pick{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;font:inherit;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.pick .pn{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick .pa{grid-row:2;color:var(--muted);font-family:var(--f-num);font-size:.85rem}
+.pick .pgo{grid-column:2;grid-row:1/3;font-weight:700;font-size:.85rem;padding:8px 12px;border-radius:10px;background:var(--accent);color:var(--accent-fg)}
+.pick.on .pgo{background:var(--ok);color:#fff}
+.pick:active{transform:scale(.98)}
+.kerr{display:block;margin-top:6px;font-weight:400;font-size:.8rem;color:var(--muted);font-family:var(--f-num);word-break:break-word}
+.help{font-size:.88rem;color:var(--muted);line-height:1.45}
+.help b{color:var(--fg)}
+.acts.sec button{font-weight:400;padding:10px 14px}
+.qlist{display:flex;flex-direction:column}
+.qitem{display:grid;grid-template-columns:28px 78px minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:10px;row-gap:2px;padding-block:10px;border-bottom:1px solid var(--line);align-items:center}
+.qitem .pos{grid-row:1/3;font-family:var(--f-num);color:var(--muted);font-weight:700;text-align:right}
+.qitem .num{grid-row:1/3}
+.qitem .qb{grid-column:2/4;display:flex;gap:8px;padding-top:6px}
+.qitem .qb button{font:inherit;font-size:.85rem;font-weight:700;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.adj{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:10px}
+.step{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto;align-items:center;gap:4px 8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+.step .sl{grid-column:1/4;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.step button{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-size:1.4rem;font-weight:700;cursor:pointer;line-height:1}
+.step button:active,.melody:active{transform:scale(.94)}
+.step output{text-align:center;font-family:var(--f-num);font-weight:700;font-size:1.25rem;font-variant-numeric:tabular-nums;color:var(--num)}
+.melody{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font:inherit;font-weight:700;cursor:pointer}
+.melody small{font-weight:400;font-size:.78rem;color:var(--muted)}
+.card h3{font-family:var(--f-display);font-weight:800;font-size:1.2rem;margin:4px 0 0}
+.nowcard{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:12px;background:var(--num-bg)}
+.nowcard .lbl{color:var(--num)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;z-index:30}
+@media (prefers-reduced-motion:no-preference){.card{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+</style>
+
+<div class="app" id="app">
+  <div class="side">
+    <div class="top stage gut">
+      <div class="brand"><button class="wordmark" id="about-btn" type="button" aria-label="About Songbook"><h1>Songbook</h1></button><small id="total"></small></div>
+      <button class="conn" id="conn" type="button" data-s="off" hidden><span class="dot" aria-hidden="true"></span><span id="conn-t">Connect karaoke</span></button>
+    </div>
+    <div class="modes stage gut" role="group" aria-label="Browse by">
+      <button id="m-alpha" data-mode="alpha" aria-pressed="true">A–Z</button>
+      <button id="m-artist" data-mode="artist" aria-pressed="false">Artist</button>
+      <button id="m-sort" type="button" class="msort" aria-label="Sort songs"><span class="mh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l-4 4h3v12h2V8h3zM17 20l4-4h-3V4h-2v12h-3z"/></svg></span><span id="sortl">Title</span></button>
+      <button id="m-fav" data-mode="fav" aria-pressed="false"><span class="mh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.4C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.5 1.2 4.4 2.5.9-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.1C19.5 16.4 12 21 12 21z"/></svg></span>Favorites<span class="fc" id="favcount"></span></button>
+      <button id="m-hist" data-mode="hist" aria-pressed="false"><span class="mh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.6-4-2.4V7z"/></svg></span>History</button>
+    </div>
+    <div class="letters stage gut" id="letters" role="group" aria-label="Filter by first letter"></div>
+    <div class="np" id="np" hidden></div>
+  </div>
+  <div class="main">
+    <div class="srow stage gut">
+      <label class="search" for="q">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="Search title, artist or song number" aria-label="Search songs">
+        <button id="clear" type="button" aria-label="Clear search" hidden>×</button>
+      </label>
+      <button class="kpbtn" id="kpbtn" type="button" aria-label="Enter song number on keypad"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="4" height="4" rx="1"/><rect x="10" y="3" width="4" height="4" rx="1"/><rect x="16" y="3" width="4" height="4" rx="1"/><rect x="4" y="9" width="4" height="4" rx="1"/><rect x="10" y="9" width="4" height="4" rx="1"/><rect x="16" y="9" width="4" height="4" rx="1"/><rect x="4" y="15" width="4" height="4" rx="1"/><rect x="10" y="15" width="4" height="4" rx="1"/><rect x="16" y="15" width="4" height="4" rx="1"/><rect x="10" y="20" width="4" height="3" rx="1"/></svg></button>
+    </div>
+    <div class="bar gut" id="bar"></div>
+    <div class="thead gut" id="thead"><div>Song No.</div><div>Title</div><div>Artist</div><div>Category</div><div><span class="vh">Favorite</span></div></div>
+    <div class="list" id="list"><div class="spacer" id="spacer"></div></div>
+  </div>
+</div>
+<div class="sheet" id="sheet" hidden></div>
+
+<script id="songdata" type="application/json">/*DATA*/</script>
+<script>
+(function(){
+const D=JSON.parse(document.getElementById('songdata').textContent);
+const ART=D.a, CAT=D.c;
+const lines=D.s.split('\n');
+const N=lines.length;
+const num=new Array(N), title=new Array(N), art=new Int32Array(N), cat=new Int32Array(N), letter=new Array(N), hay=new Array(N);
+function firstLetter(s){const m=s.match(/[0-9A-Za-zÀ-ɏ]/);if(!m)return'#';const c=m[0].normalize('NFD')[0].toUpperCase();return /[A-Z]/.test(c)?c:'#'}
+for(let i=0;i<N;i++){const p=lines[i].split('\t');num[i]=p[0];title[i]=p[1];art[i]=+p[2];cat[i]=+p[3];letter[i]=firstLetter(p[1]);hay[i]=(p[0]+' '+p[1]+' '+ART[+p[2]]).toLowerCase()}
+const artLetter=ART.map(firstLetter);
+const artSongs=ART.map(()=>[]);for(let i=0;i<N;i++)artSongs[art[i]].push(i);
+const catCount=CAT.map(()=>0);for(let i=0;i<N;i++)catCount[cat[i]]++;
+const LETTERS=['All','#',...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+// Favorites: saved on this device as a list of song numbers
+const numIdx=new Map();for(let i=0;i<N;i++)numIdx.set(num[i],i);
+const favSet=new Set();
+try{(JSON.parse(localStorage.getItem('songbook-favs')||'[]')||[]).forEach(c=>{const i=numIdx.get(String(c));if(i!==undefined)favSet.add(i)})}catch(e){}
+function saveFavs(){try{localStorage.setItem('songbook-favs',JSON.stringify([...favSet].map(i=>num[i])))}catch(e){}}
+const HEART='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.4C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.5 1.2 4.4 2.5.9-1.3 2.3-2.5 4.4-2.5 3.6 0 5.7 3.7 4.2 7.1C19.5 16.4 12 21 12 21z"/></svg>';
+
+const APP_VERSION='3.2';
+const $=id=>document.getElementById(id);
+const listEl=$('list'), spacer=$('spacer'), bar=$('bar'), lettersEl=$('letters'), q=$('q');
+$('total').textContent=N.toLocaleString()+' songs';
+
+let saved={};try{saved=JSON.parse(localStorage.getItem('songbook')||'{}')}catch(e){}
+const st={mode:'alpha',letter:saved.letter||'A',artist:-1,cat:saved.cat??0,query:'',sort:saved.sort==='num'?'num':'title'};
+if(!LETTERS.includes(st.letter))st.letter='A';
+if(!(st.cat>=0&&st.cat<CAT.length))st.cat=0;
+function save(){try{localStorage.setItem('songbook',JSON.stringify({letter:st.letter,cat:st.cat,sort:st.sort}))}catch(e){}}
+// songs in song-number order (the main list is already in title order)
+const numOrder=Array.from({length:N},(_,i)=>i).sort((a,b)=>num[a]<num[b]?-1:num[a]>num[b]?1:a-b);
+const numRank=new Int32Array(N);numOrder.forEach((i,k)=>numRank[i]=k);
+const ORDER=()=>st.sort==='num'?numOrder:null;
+/* ---------- History: songs reserved/played from this app, and songs SongHub played ---------- */
+let HIST=[];try{HIST=(JSON.parse(localStorage.getItem('songbook-history')||'[]')||[]).filter(h=>h&&h.c)}catch(e){HIST=[]}
+const saveHist=()=>{try{localStorage.setItem('songbook-history',JSON.stringify(HIST))}catch(e){}};
+const H_LABEL={res:'Reserved',first:'Reserved 1st',now:'Played now',played:'Played'};
+function addHistory(code,kind){code=String(code||'').trim();if(!code)return;
+  HIST=HIST.filter(h=>h.c!==code);HIST.unshift({c:code,k:kind,t:Date.now()});if(HIST.length>300)HIST.length=300;saveHist();
+  if(st.mode==='hist'){const top=listEl.scrollTop;refresh(false);listEl.scrollTop=top;draw()}}
+function whenText(t){const d=new Date(t),now=new Date(),hm=d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();const diff=(day(now)-day(d))/864e5;
+  return diff===0?hm:diff===1?'Yesterday '+hm:d.toLocaleDateString([], {day:'numeric',month:'short'})+' '+hm}
+let histInfo=new Map();
+
+let rows=[], kind='song';
+const appEl=document.getElementById('app');
+const isWide=()=>(listEl.clientWidth||innerWidth)>=700;
+const rhCache={};
+function rh(){  // measure a sample row so heights follow the phone's text size setting
+  const wide=isWide();appEl.classList.toggle('wide',wide);const key=kind+(wide?'w':'n');if(rhCache[key])return rhCache[key];
+  const base=kind==='artist'?60:(wide?48:64);
+  const el=document.createElement('div');el.className=kind==='artist'?'arow gut':'row gut';
+  el.style.cssText='position:absolute;visibility:hidden;top:-9999px;height:auto;padding-block:10px';
+  el.innerHTML=kind==='artist'?'<span class="ini">A</span><span class="an">Ag</span><span class="ac">9 songs</span>'
+    :'<span class="num">000000</span><span class="title">Ag</span><span class="artist">Ag<span class="cat-inline">Pop</span></span><span class="cat">Pop</span><button class="fav"></button>';
+  spacer.appendChild(el);
+  const h=Math.max(base,Math.ceil(el.getBoundingClientRect().height));el.remove();
+  return rhCache[key]=h}
+
+function compute(){
+  const qq=st.query.trim().toLowerCase();
+  const terms=qq?qq.split(/\s+/):[];
+  const L=st.letter;
+  const match=i=>{for(const t of terms)if(hay[i].indexOf(t)<0)return false;return true};
+  if(st.mode==='artist'&&st.artist<0){
+    kind='artist';rows=[];
+    for(let a=0;a<ART.length;a++){
+      if(terms.length){const n=ART[a].toLowerCase();if(!terms.every(t=>n.includes(t)))continue}
+      else if(L!=='All'&&artLetter[a]!==L)continue;
+      rows.push(a)}
+    return}
+  kind='song';rows=[];
+  if(st.mode==='hist'){histInfo=new Map();for(const h of HIST){const i=findSong(h.c);if(i<0||histInfo.has(i)||!match(i))continue;histInfo.set(i,h);rows.push(i)}return}
+  const O=ORDER();
+  if(st.mode==='artist'){for(const i of artSongs[st.artist])if(match(i))rows.push(i);if(O)rows.sort((a,b)=>numRank[a]-numRank[b]);return}
+  if(st.mode==='fav'){for(let k=0;k<N;k++){const i=O?O[k]:k;if(favSet.has(i)&&match(i))rows.push(i)}return}
+  for(let k=0;k<N;k++){const i=O?O[k]:k;
+    if(st.mode==='cat'&&cat[i]!==st.cat)continue;
+    if(terms.length){if(!match(i))continue}
+    else if(L!=='All'&&letter[i]!==L)continue;
+    rows.push(i)}
+}
+
+function letterCounts(){
+  const c={};LETTERS.forEach(l=>c[l]=0);
+  if(st.mode==='artist'&&st.artist<0){for(const l of artLetter)c[l]++}
+  else if(st.mode==='cat'){for(let i=0;i<N;i++)if(cat[i]===st.cat)c[letter[i]]++}
+  else if(st.mode==='alpha'){for(const l of letter)c[l]++}
+  return c}
+
+function renderLetters(){
+  const show=!(st.mode==='artist'&&st.artist>=0)&&st.mode!=='fav'&&st.mode!=='hist';
+  lettersEl.hidden=!show; if(!show)return;
+  const c=letterCounts(); const searching=st.query.trim()!=='';
+  lettersEl.innerHTML=LETTERS.map(l=>`<button type="button" data-l="${l}" aria-pressed="${!searching&&st.letter===l}" class="${l!=='All'&&!c[l]?'dim':''}" aria-label="${l==='All'?'All letters':l==='#'?'Numbers and symbols':'Letter '+l}">${l}</button>`).join('');
+  const on=lettersEl.querySelector('[aria-pressed="true"]');if(on)on.scrollIntoView({block:'nearest',inline:'center'});
+}
+
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function hl(s){
+  const terms=st.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(!terms.length)return esc(s);
+  const re=new RegExp('('+terms.map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','gi');
+  return s.split(re).map((p,k)=>k%2?'<mark>'+esc(p)+'</mark>':esc(p)).join('')}
+
+const SORT_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l-4 4h3v12h2V8h3zM17 20l4-4h-3V4h-2v12h-3z"/></svg>';
+function renderBar(){
+  const n=rows.length.toLocaleString();
+  const searching=st.query.trim()!=='';
+  let h='';
+  if(st.mode==='artist'&&st.artist>=0){
+    h=`<button class="back" id="back" type="button">‹ Artists</button><span class="crumb">${esc(ART[st.artist])}</span><span class="count">${n} song${rows.length===1?'':'s'}</span>`}
+  else if(st.mode==='artist'){
+    h=`<span class="crumb">${searching?'Artists matching “'+esc(st.query.trim())+'”':st.letter==='All'?'All artists':'Artists · '+st.letter}</span><span class="count">${n} artists</span>`}
+  else if(st.mode==='hist'){
+    h=`<span class="crumb">${searching?'History matching “'+esc(st.query.trim())+'”':'History'}</span><span class="count">${n} song${rows.length===1?'':'s'}</span>${HIST.length?'<button class="sortb" type="button" id="hclear">Clear</button>':''}`}
+  else if(st.mode==='fav'){
+    h=`<span class="crumb">${searching?'Favorites matching “'+esc(st.query.trim())+'”':'My favorites'}</span><span class="count">${n} song${rows.length===1?'':'s'}</span>`}
+  else if(st.mode==='cat'){
+    h=`<div class="chips" role="group" aria-label="Category">${CAT.map((c,k)=>`<button class="chip" type="button" data-c="${k}" aria-pressed="${k===st.cat}">${esc(c)}<span>${catCount[k].toLocaleString()}</span></button>`).join('')}</div><span class="count">${n} songs</span>`}
+  else{
+    h=`<span class="crumb">${searching?'Results for “'+esc(st.query.trim())+'”':st.letter==='All'?'All songs':'Titles starting with '+(st.letter==='#'?'a number or symbol':st.letter)}</span><span class="count">${n} songs</span>`}
+  bar.innerHTML=h;
+  const hc=$('hclear');if(hc)hc.onclick=()=>{const old=HIST.slice();HIST=[];saveHist();refresh(true);toast('History cleared',3500,{label:'Undo',fn:()=>{HIST=old;saveHist();refresh(true)}})};
+  const b=$('back');if(b)b.onclick=()=>{st.artist=-1;refresh(true)};
+  bar.querySelectorAll('[data-c]').forEach(el=>el.onclick=()=>{st.cat=+el.dataset.c;save();refresh(true)});
+}
+
+const pool=new Map();
+function draw(){
+  const h=rh();
+  appEl.classList.toggle('wide',isWide());
+  listEl.style.setProperty('--rh',h+'px');
+  $('thead').style.visibility=kind==='song'?'visible':'hidden';
+  spacer.style.height=(rows.length*h)+'px';
+  const top=listEl.scrollTop, vh=listEl.clientHeight||600;
+  const a=Math.max(0,Math.floor(top/h)-8), b=Math.min(rows.length,Math.ceil((top+vh)/h)+8);
+  const keep=new Set();
+  for(let r=a;r<b;r++){
+    const key=kind+r; keep.add(key);
+    if(pool.has(key))continue;
+    const el=document.createElement('div');
+    el.style.top=(r*h)+'px'; el.tabIndex=0; el.setAttribute('role','button');
+    if(kind==='artist'){
+      const ai=rows[r]; el.className='arow gut'; el.dataset.a=ai;
+      const c=artSongs[ai].length;
+      el.innerHTML=`<span class="ini" aria-hidden="true">${esc(artLetter[ai])}</span><span class="an">${hl(ART[ai])}</span><span class="ac">${c} song${c===1?'':'s'}</span>`;
+    }else{
+      const i=rows[r]; el.className='row gut'; el.dataset.i=i;
+      const hh=st.mode==='hist'?histInfo.get(i):null, tag=hh?(H_LABEL[hh.k]||'Played')+' · '+whenText(hh.t):CAT[cat[i]];
+      el.innerHTML=`<span class="num">${hl(num[i])}</span><span class="title">${hl(title[i])}</span><span class="artist">${hl(ART[art[i]])}<span class="cat-inline${hh?' when':''}">${esc(tag)}</span></span><span class="cat">${esc(tag)}</span>${favBtn(i)}`;
+    }
+    spacer.appendChild(el); pool.set(key,el);
+  }
+  for(const [k,el] of pool)if(!keep.has(k)){el.remove();pool.delete(k)}
+  if(!rows.length){spacer.innerHTML=st.mode==='hist'&&!st.query.trim()?`<div class="empty">No history yet.<br>Songs you reserve or play, and songs SongHub plays, will appear here.</div>`:st.mode==='fav'&&!st.query.trim()?`<div class="empty">No favorites yet.<br>Tap the heart on any song to add it here.</div>`:'<div class="empty">No songs match. Try fewer words, or check the spelling.</div>';pool.clear()}
+  else{const e=spacer.querySelector('.empty');if(e)e.remove()}
+}
+function favBtn(i){const on=favSet.has(i);return `<button type="button" class="fav" data-fav="${i}" aria-pressed="${on}" aria-label="${on?'Remove from':'Add to'} Favorites">${HEART}</button>`}
+function updateFavCount(){$('favcount').textContent=favSet.size?String(favSet.size):''}
+function toggleFav(i){
+  const on=!favSet.has(i);on?favSet.add(i):favSet.delete(i);saveFavs();updateFavCount();
+  document.querySelectorAll(`[data-fav="${i}"]`).forEach(b=>{b.setAttribute('aria-pressed',on);b.setAttribute('aria-label',(on?'Remove from':'Add to')+' Favorites');const t=b.querySelector('.fbl');if(t)t.textContent=on?'Saved':'Favorite'});
+  if(st.mode==='fav'){const top=listEl.scrollTop;refresh(false);listEl.scrollTop=top;draw()}
+  if(on)toast('Added to Favorites');
+  else toast('Removed from Favorites',3500,{label:'Undo',fn:()=>{if(!favSet.has(i))toggleFav(i)}});
+}
+function clearPool(){for(const el of pool.values())el.remove();pool.clear();const e=spacer.querySelector('.empty');if(e)e.remove()}
+
+function refresh(resetScroll){
+  compute();clearPool();
+  if(resetScroll)listEl.scrollTop=0;
+  updateFavCount();
+  $('sortl').textContent=st.sort==='num'?'No.':'Title';
+  $('m-sort').setAttribute('aria-label','Sort songs: now by '+(st.sort==='num'?'song number':'title')+'. Tap to change.');
+  ['alpha','artist','fav','hist'].forEach(m=>document.querySelector(`[data-mode="${m}"]`).setAttribute('aria-pressed',st.mode===m));
+  const ab=document.querySelector('.modes [aria-pressed="true"]');if(ab)ab.scrollIntoView({block:'nearest',inline:'nearest'});modesFade();
+  renderLetters();renderBar();draw();
+}
+
+// tab row slides sideways; fade the edge that has more tabs past it
+const modesEl=document.querySelector('.modes');
+function modesFade(){const m=modesEl,max=m.scrollWidth-m.clientWidth;m.classList.toggle('more-l',m.scrollLeft>4);m.classList.toggle('more-r',m.scrollLeft<max-4)}
+modesEl.addEventListener('scroll',modesFade,{passive:true});window.addEventListener('resize',modesFade);
+try{new ResizeObserver(modesFade).observe(modesEl.lastElementChild)}catch(e){}
+document.fonts&&document.fonts.ready.then(modesFade);
+let raf=0;listEl.addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;draw()})},{passive:true});
+const relayout=()=>{for(const k in rhCache)delete rhCache[k];clearPool();draw()};
+window.addEventListener('resize',relayout);
+document.fonts&&document.fonts.ready.then(relayout);
+try{new ResizeObserver(()=>{const w=isWide();if(w!==appEl.classList.contains('wide'))relayout()}).observe(listEl)}catch(e){}
+
+$('m-sort').onclick=()=>{st.sort=st.sort==='num'?'title':'num';save();refresh(true);
+  toast(st.mode==='hist'?'History is always newest first':st.sort==='num'?'Sorted by song number':'Sorted by title',1300)};
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{st.mode=b.dataset.mode;st.artist=-1;refresh(true)});
+lettersEl.addEventListener('click',e=>{const b=e.target.closest('[data-l]');if(!b)return;st.letter=b.dataset.l;if(st.query){st.query='';q.value='';$('clear').hidden=true}save();refresh(true)});
+
+let qt=0;
+q.addEventListener('input',()=>{$('clear').hidden=!q.value;clearTimeout(qt);qt=setTimeout(()=>{st.query=q.value;refresh(true)},140)});
+$('clear').onclick=()=>{q.value='';st.query='';$('clear').hidden=true;refresh(true);q.focus()};
+q.addEventListener('keydown',e=>{if(e.key==='Enter')q.blur()});
+
+function activate(el){
+  if(el.dataset.a!==undefined){st.artist=+el.dataset.a;st.query='';q.value='';$('clear').hidden=true;refresh(true);return}
+  if(el.dataset.i!==undefined)openSheet(+el.dataset.i)}
+spacer.addEventListener('click',e=>{const f=e.target.closest('[data-fav]');if(f){toggleFav(+f.dataset.fav);return}const el=e.target.closest('[data-i],[data-a]');if(el)activate(el)});
+spacer.addEventListener('keydown',e=>{if(e.target.closest('[data-fav]'))return;if(e.key==='Enter'||e.key===' '){const el=e.target.closest('[data-i],[data-a]');if(el){e.preventDefault();activate(el)}}});
+
+const sheet=$('sheet');
+let sheetMode='';
+function toast(msg,ms,act){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;
+  if(act){const b=document.createElement('button');b.type='button';b.textContent=act.label;b.onclick=()=>{t.remove();act.fn()};t.appendChild(b)}
+  document.body.appendChild(t);setTimeout(()=>t.remove(),ms||1800)}
+
+/* ---------- SongHub Wi-Fi remote ---------- */
+// Protocol used by SongHub's own Smart Link remote: ws://host:48080
+// Play now = binary [1]+number, Reserve = binary [2]+number, Reserve 1st = {"action":"priority","payload":number}
+// Remove from queue = {"action":"remove","payload":number}; host pushes {"type":"state_update","queue":[...],"status":..,"now_playing":{..}}
+const CAN_K=location.protocol==='file:'||location.protocol==='http:';
+const K={adj:{key:0,tempo:0,code:null},ws:null,host:'',port:48080,state:'off',queue:[],now:null,status:'IDLE',retry:0,timer:0,wanted:false,everOn:false,pending:null};
+try{const s=JSON.parse(localStorage.getItem('songbook-karaoke')||'{}');K.host=s.host||'';K.port=s.port||48080;K.link=s.link==='bt'?'bt':'wifi';K.btAddr=s.bt||'';K.btName=s.btName||''}catch(e){K.link='wifi'}
+const byCode=new Map(), byNorm=new Map();
+const norm=c=>String(c).trim().replace(/^0+(?=\d)/,'');
+for(let i=0;i<N;i++){byCode.set(num[i],i);byNorm.set(norm(num[i]),i)}
+const findSong=c=>{c=String(c).trim();return byCode.has(c)?byCode.get(c):byNorm.has(norm(c))?byNorm.get(norm(c)):-1};
+function parseAddr(s){s=(s||'').trim().replace(/^wss?:\/\//i,'').replace(/\/.*$/,'');if(!s)return null;const m=s.match(/^([^:\s]+)(?::(\d{1,5}))?$/);return m?{host:m[1],port:m[2]?+m[2]:48080}:null}
+const addrText=()=>K.host?K.host+':'+K.port:'';
+function kOpen(){return K.link==='bt'?K.bt.state==='connected':!!(K.ws&&K.ws.readyState===1)}
+/* ---------- Bluetooth keypad: the phone acts as a Bluetooth keyboard for SongHub (see BtKeypad.java) ----------
+   SongHub keys: 0-9 type a number, Enter reserves it, Media Play/Pause, Media Stop, Media Next,
+   F2 melody step, F3/F4 key -/+, F5/F6 tempo -/+. Nothing comes back over Bluetooth, so there's no queue
+   or now-playing info, and Reserve 1st / Play now / Replay / Remove aren't available. */
+let NBT=null;try{if(window.AndroidBt&&AndroidBt.available())NBT=window.AndroidBt}catch(e){}
+K.bt={state:'off',name:'',addr:'',error:''};K.connTab=K.link;
+const BT_ONLY=new Error('Not available over Bluetooth');
+function btKeys(list){if(!list.length)return;if(!NBT||K.bt.state!=='connected')throw new Error('Bluetooth keypad not connected');if(!NBT.send(list.join(',')))throw new Error('Bluetooth send failed');K.btLastT=Date.now()}
+// SongHub drops typed digits 5 s after the last key, so only clear old digits if we typed recently
+const btClear=()=>Date.now()-(K.btLastT||0)<5500?Array(6).fill('bksp'):[];
+const btDigits=code=>String(code).replace(/\D/g,'').split('');
+// In the Android app, the connection is made by the app's own code (AndroidWs), like SongHub's official remote.
+// The page's built-in WebSocket can be blocked from reaching other devices on the Wi-Fi.
+const NWS=window.AndroidWs||null;
+window.__kws={map:new Map(),
+  open(id){const s=this.map.get(id);if(s&&s.readyState===0){s.readyState=1;s.onopen&&s.onopen()}},
+  msg(id,t){const s=this.map.get(id);if(s&&s.readyState===1&&s.onmessage)s.onmessage({data:t})},
+  close(id,r){const s=this.map.get(id);if(!s)return;this.map.delete(id);s.readyState=3;s.onclose&&s.onclose({reason:r||''})}};
+let nwsId=0;
+class NativeSocket{
+  constructor(host,port){this.id=++nwsId;this.readyState=0;this.binaryType='arraybuffer';__kws.map.set(this.id,this);NWS.connect(this.id,host,port)}
+  send(d){if(this.readyState!==1)throw Error('not open');
+    const ok=typeof d==='string'?NWS.sendText(this.id,d):NWS.sendBytes(this.id,Array.from(new Uint8Array(d)).join(','));
+    if(!ok)throw Error('send failed')}
+  close(){if(this.readyState>=2)return;this.readyState=2;NWS.close(this.id)}}
+function kConnect(){
+  if(K.link==='bt')return;
+  clearTimeout(K.timer);if(!K.host)return;
+  const old=K.ws;K.ws=null;try{old&&old.close()}catch(e){}
+  K.wanted=true;setK(K.everOn?'retry':'connecting');
+  let ws;try{ws=NWS?new NativeSocket(K.host,K.port):new WebSocket('ws://'+K.host+':'+K.port)}catch(e){K.wanted=false;setK('error');return}
+  ws.binaryType='arraybuffer';K.ws=ws;
+  ws.onopen=()=>{if(K.ws!==ws)return;K.retry=0;K.everOn=true;K.lastErr='';setK('on')};
+  ws.onmessage=e=>{if(K.ws!==ws||typeof e.data!=='string')return;let j;try{j=JSON.parse(e.data)}catch(_){return}
+    if(j&&j.type==='state_update'){K.queue=Array.isArray(j.queue)?j.queue.map(String):[];K.status=String(j.status||'IDLE');
+      K.now=j.now_playing&&j.now_playing.code&&K.status!=='IDLE'?j.now_playing:null;
+      if(K.now&&norm(K.now.code)!==K.lastPlayed){K.lastPlayed=norm(K.now.code);const hi=findSong(K.now.code);if(hi>=0&&!(HIST[0]&&norm(HIST[0].c)===K.lastPlayed&&Date.now()-HIST[0].t<15000))addHistory(num[hi],'played')}
+      {const c=K.now?norm(K.now.code):null;if(c!==K.adj.code){K.adj={key:0,tempo:0,code:c}}}
+      // SongHub reports its real values: transpose (key) and tempo -8..+8, melody 0..5 (Off,20,40,60,80,Max)
+      if(typeof j.transpose==='number')K.adj.key=j.transpose;
+      if(typeof j.tempo==='number')K.adj.tempo=j.tempo;
+      if(typeof j.melody==='number'&&j.melody>=0&&j.melody<=5){K.mel=j.melody;K.melKnown=true;saveMel();if(melWait)melWait()}renderNP();checkPending();if(sheetMode==='queue')openQueue()}};
+  ws.onclose=ev=>{if(K.ws!==ws)return;K.ws=null;K.lastErr=(ev&&ev.reason)||'';
+    if(K.wanted){setK(K.everOn?'retry':'error');const d=Math.min(15000,1500*2**K.retry++);K.timer=setTimeout(kConnect,d)}else setK('off')};
+}
+function kDisconnect(){K.wanted=false;K.everOn=false;clearTimeout(K.timer);const w=K.ws;K.ws=null;try{w&&w.close()}catch(e){}K.queue=[];K.now=null;setK('off')}
+function sendOp(op,code){if(K.link==='bt'){if(op===2)return btKeys([...btClear(),...btDigits(code),'enter']);if(op===0)return btKeys(['playpause']);throw BT_ONLY}const b=new TextEncoder().encode(code);const a=new Uint8Array(b.length+1);a[0]=op;a.set(b,1);K.ws.send(a.buffer)}
+function sendInt(op,v){if(K.link==='bt'){if(op===4)return btKeys([v>0?'f4':'f3']);if(op===5)return btKeys([v>0?'f6':'f5']);throw BT_ONLY}K.ws.send(new Uint8Array([op,v&255]).buffer)}
+function sendAct(action,payload){if(K.link==='bt'){const m={next:'next',stop:'stop',melody:'f2'}[action];if(!m)throw BT_ONLY;return btKeys([m])}K.ws.send(JSON.stringify(payload==null?{action}:{action,payload:String(payload)}))}
+const K_LABEL={off:'Connect karaoke',connecting:'Connecting…',on:'Connected',retry:'Reconnecting…',error:'Not connected'};
+const K_LABEL_BT={off:'Connect karaoke',connecting:'Connecting…',on:'Connected (BT)',retry:'Connecting…',error:'Not connected'};
+function setK(s){K.state=s;const c=$('conn');c.dataset.s=s;$('conn-t').textContent=(K.link==='bt'?K_LABEL_BT:K_LABEL)[s];renderNP();if(sheetMode==='connect'){if(K.link==='bt')renderBt();else{renderConnectStatus();renderScan()}}}
+function renderNP(){
+  const np=$('np');const show=CAN_K&&(K.state==='on'||(K.state==='retry'&&K.everOn));np.hidden=!show;if(!show)return;
+  let t;if(K.now){t=`<span class="st">${K.status==='paused'?'Paused':'Now playing'}</span><span class="t"><span class="tt">${esc(String(K.now.title||K.now.code))}</span> <small>${esc(String(K.now.artist||''))}</small></span>`}
+  else if(K.link==='bt')t=`<span class="st">Bluetooth keypad</span><span class="t"><span class="tt">${esc(K.bt.name||'Karaoke device')}</span> <small>Keep SongHub's player screen open</small></span>`;
+  else t=`<span class="st">Karaoke</span><span class="t"><small>${K.state==='on'?'Nothing playing':'Reconnecting…'}</small></span>`;
+  requestAnimationFrame(fitCtl);
+  np.innerHTML=`<button class="npinfo gut" type="button" data-openq aria-label="Show queue">${t}<span class="qc"${K.link==='bt'?' hidden':''} title="Songs in queue"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="currentColor"><path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h10v2H4z"/></svg>${K.queue.length}<span class="vh"> in queue</span> ›</span></button>${ctlHTML()}${panelHTML()}`;
+}
+const ICON={
+  replay:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>',
+  play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
+  next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg>'};
+const isPlaying=()=>{const s=String(K.status).toLowerCase();return s!=='idle'&&s!=='paused'&&s!==''&&s!=='stopped'};
+const fmtAdj=v=>v>0?'+'+v:String(v);
+// Melody: SongHub steps Off → 20 → 40 → 60 → 80 → Max on each "melody" command, then back to Off.
+// SongHub doesn't report the level, so this phone remembers where it last set it.
+const MEL=['Off','20','40','60','80','Max'];
+try{K.mel=Math.max(0,Math.min(5,+localStorage.getItem('songbook-melody')||0))}catch(e){K.mel=0}
+const saveMel=()=>{try{localStorage.setItem('songbook-melody',String(K.mel))}catch(e){}};
+K.panel='';K.melFix=false;K.melKnown=false;let melWait=null;
+// Row of controls under the song bar (Tempo · Keys · Melody · Start/Pause · Stop · Next)
+function ctlHTML(){const pl=isPlaying();const on=w=>K.panel===w?' aria-expanded="true"':' aria-expanded="false"';
+  return `<div class="ctl gut" role="group" aria-label="Karaoke controls">
+   <button type="button" data-panel="tempo"${on('tempo')}><b class="v">${fmtAdj(K.adj.tempo)}</b><span>Tempo</span></button>
+   <button type="button" data-panel="key"${on('key')}><b class="v">${fmtAdj(K.adj.key)}</b><span>Keys</span></button>
+   <button type="button" data-panel="melody"${on('melody')}><b class="v">${MEL[K.mel]}</b><span>Melody</span></button>
+   <button type="button" class="pp" data-tp="pp">${K.link==='bt'?ICON.play:pl?ICON.pause:ICON.play}<span>${K.link==='bt'?'Play/Pause':pl?'Pause':'Start'}</span></button>
+   <button type="button" data-tp="stop">${ICON.stop}<span>Stop</span></button>
+   <button type="button" data-tp="next">${ICON.next}<span>Next</span></button></div>`}
+function panelHTML(){
+  if(K.panel==='tempo'||K.panel==='key'){const n=K.panel,L=n==='key'?'Keys':'Tempo';
+    return `<div class="panel gut"><span class="pl">${L}</span>
+      <button type="button" class="sbtn" data-adj="${n}-" aria-label="${n==='key'?'Key down':'Slower'}">−</button>
+      <output id="adj-${n}" aria-live="polite">${fmtAdj(K.adj[n])}</output>
+      <button type="button" class="sbtn" data-adj="${n}+" aria-label="${n==='key'?'Key up':'Faster'}">+</button>
+      <button type="button" class="pdone" data-panel="">Done</button></div>`}
+  if(K.panel==='melody'){
+    return `<div class="panel mel gut"><span class="pl">${K.melFix?'Tap the level SongHub shows now':'Melody'}</span>
+      <div class="chips mchips">${MEL.map((m,k)=>`<button type="button" class="chip" data-mel="${k}" aria-pressed="${k===K.mel}">${m}</button>`).join('')}</div>
+      <div class="pfoot">${K.melKnown?'<span class="plink" style="text-decoration:none">Level from SongHub</span>':`<button type="button" class="plink" data-melfix>${K.melFix?'Cancel':'Level wrong? Fix it'}</button>`}<button type="button" class="pdone" data-panel="">Done</button></div></div>`}
+  return ''}
+function fitCtl(){
+  document.querySelectorAll('.ctl button span, .ctl button .v').forEach(el=>{
+    el.style.removeProperty('--fs');let f=1;
+    for(let n=0;n<12&&el.scrollWidth>el.clientWidth+1;n++){f*=0.92;el.style.setProperty('--fs',f.toFixed(3))}});
+}
+window.addEventListener('resize',()=>requestAnimationFrame(fitCtl));
+document.fonts&&document.fonts.ready.then(fitCtl);
+function kTransport(what){
+  if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
+  try{
+    if(what==='pp'){const was=isPlaying();sendOp(0,'');
+      if(K.link!=='bt'&&(K.now||was)){K.status=was?'paused':'playing';renderNP();if(sheetMode==='queue')openQueue()}  // flip right away; the next state update confirms
+      toast(K.link==='bt'?'Play/Pause':was?'Paused':'Start');}
+    else{sendAct(what,null);toast(what==='next'?'Next song':what==='stop'?'Stopped':'Replaying song')}
+  }catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.')}
+}
+// Key = binary [4,±1], Tempo = binary [5,±1] — same as SongHub's official remote. Counts are taps since the song started.
+function kAdjust(what){
+  if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
+  try{const name=what.slice(0,-1),d=what.endsWith('+')?1:-1;
+    sendInt(name==='key'?4:5,d);K.adj[name]+=d;renderNP();
+    toast((name==='key'?'Key ':'Tempo ')+fmtAdj(K.adj[name]),1000);
+  }catch(e){toast('Could not send. Check the connection.')}
+}
+let melBusy=false;
+function kMelody(target){
+  if(K.melFix){K.mel=target;K.melFix=false;saveMel();renderNP();toast('Melody level set to '+MEL[target]);return}
+  if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
+  if(melBusy||target===K.mel)return;
+  melBusy=true;let tries=0;
+  const finish=msg=>{melBusy=false;melWait=null;renderNP();if(msg)toast(msg)};
+  const step=()=>{
+    if(!kOpen())return finish('Connection lost while changing melody');
+    if(K.mel===target)return finish('Melody '+MEL[K.mel]);
+    if(++tries>7)return finish('Melody is at '+MEL[K.mel]+'. Try again.');
+    const before=K.mel;
+    try{sendAct('melody',null)}catch(e){return finish('Could not send. Check the connection.')}
+    if(!K.melKnown){K.mel=(K.mel+1)%6;saveMel();renderNP();setTimeout(step,400);return}   // SongHub not reporting: count presses
+    let done=false,t=0;
+    const next=()=>{if(done)return;done=true;clearTimeout(t);melWait=null;renderNP();setTimeout(step,120)};
+    melWait=()=>{if(K.mel!==before)next()};                 // SongHub confirmed the new level
+    t=setTimeout(()=>{if(!done){K.mel=(before+1)%6;next()}},1200);  // no reply: assume it stepped
+  };
+  step();
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-tp]');if(b){kTransport(b.dataset.tp);return}
+  const pn=e.target.closest('[data-panel]');if(pn){const w=pn.dataset.panel;K.panel=(w&&K.panel!==w)?w:'';K.melFix=false;renderNP();return}
+  const mc=e.target.closest('[data-mel]');if(mc){kMelody(+mc.dataset.mel);return}
+  if(e.target.closest('[data-melfix]')){K.melFix=!K.melFix;renderNP();return}
+  const a=e.target.closest('[data-adj]');if(a){kAdjust(a.dataset.adj);return}
+  if(e.target.closest('[data-openq]'))openQueue()});
+function checkPending(){const p=K.pending;if(!p)return;
+  if(Date.now()-p.at>8000){K.pending=null;return}
+  if(p.kind==='now'){if(K.now&&norm(K.now.code)===norm(p.code)){toast('Now playing: '+p.title);K.pending=null}return}
+  const idx=K.queue.findIndex(c=>norm(c)===norm(p.code));
+  if(idx>=0){toast(`${p.title} is #${idx+1} in the queue`,2400);K.pending=null}}
+function kSend(kind,i){
+  if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
+  const code=num[i];
+  try{if(kind==='now')sendOp(1,code);else if(kind==='first')sendAct('priority',code);else sendOp(2,code)}catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.');return}
+  K.pending={kind,code,title:title[i],at:Date.now()};addHistory(code,kind);
+  toast(K.link==='bt'?'Sent to SongHub: '+title[i]:kind==='now'?'Playing '+title[i]+'…':kind==='first'?'Reserved first: '+title[i]:'Reserved: '+title[i]);
+  closeSheet();
+}
+function saveK(){try{localStorage.setItem('songbook-karaoke',JSON.stringify({host:K.host,port:K.port,link:K.link,bt:K.btAddr,btName:K.btName}))}catch(e){}}
+
+function renderConnectStatus(){const el=$('kstat');if(!el)return;
+  const m={off:K.host?'Not connected.':'Enter the address shown in SongHub.',connecting:'Connecting to '+addrText()+'…',on:'Connected to '+addrText()+'.',retry:'Connection lost. Reconnecting to '+addrText()+'…',
+    error:'Could not reach '+addrText()+'. Check that SongHub is open with Remote Server turned on, and that both devices are on the same Wi-Fi. Retrying…'};
+  el.dataset.s=K.state;el.textContent=m[K.state];
+  // SongHub's browser remote page is fixed on 48081; the app remote uses SongHub's "Server Port" (48080 by default)
+  if(K.port===48081&&K.state!=='on')el.textContent+=' Note: 48081 is SongHub\'s browser remote page, not the app remote. In SongHub, set Server Port back to 48080 and connect to '+K.host+':48080.';
+  if(K.lastErr&&K.state!=='on'){const d=document.createElement('small');d.className='kerr';d.textContent='Details: '+K.lastErr;el.appendChild(d)}
+  $('kgo').textContent=K.state==='on'?'Reconnect':'Connect';$('kstop').hidden=K.state==='off';}
+function openConnect(){
+  sheetMode='connect';
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Connect to karaoke">
+    <div class="lbl">SongHub remote</div><h2>Connect to karaoke</h2>
+    ${NBT?`<div class="seg" role="tablist" aria-label="Connection type"><button type="button" role="tab" data-ctab="wifi" aria-selected="${K.connTab!=='bt'}">Wi-Fi</button><button type="button" role="tab" data-ctab="bt" aria-selected="${K.connTab==='bt'}">Bluetooth keypad</button></div>`:''}
+    <div id="btbox" class="btbox"${K.connTab==='bt'&&NBT?'':' hidden'}></div>
+    <div id="wifibox" class="wifibox"${K.connTab==='bt'&&NBT?' hidden':''}>
+    ${CAN_SCAN?'<div class="scan" id="scanbox"></div>':''}
+    <form id="kform" class="field" autocomplete="off"><label for="khost">Address and port</label>
+      <input id="khost" inputmode="url" placeholder="192.168.1.18:48080" value="${esc(addrText())}" spellcheck="false" autocapitalize="off"></form>
+    <div class="kstat" id="kstat" role="status"></div>
+    <div class="acts"><button class="primary" id="kgo" type="button">Connect</button><button id="kstop" type="button">Disconnect</button><button id="close" type="button">Close</button></div>
+    <p class="help">In SongHub, open <b>Settings → Remote Broadcasting</b> and turn on <b>Enable Remote Server</b>. ${CAN_SCAN?'Tap <b>Scan</b> to find it, or type':'Type'} the address it shows, for example <b>192.168.1.18:48080</b>. Both devices must be on the same Wi-Fi.</p></div></div>`;
+  sheet.hidden=false;
+  const go=()=>{const a=parseAddr($('khost').value);if(!a){$('kstat').dataset.s='error';$('kstat').textContent='Type an address like 192.168.1.18:48080.';return}
+    if(K.link==='bt'){try{NBT&&NBT.disconnect()}catch(e){}K.link='wifi';setK('off')}
+    K.host=a.host;K.port=a.port;K.retry=0;K.everOn=false;saveK();$('khost').value=addrText();$('khost').blur();kConnect()};
+  $('kform').onsubmit=e=>{e.preventDefault();go()};
+  $('kgo').onclick=go;$('kstop').onclick=()=>{kDisconnect()};$('close').onclick=closeSheet;
+  if(NBT){
+    sheet.querySelectorAll('[data-ctab]').forEach(b=>b.onclick=()=>{K.connTab=b.dataset.ctab;
+      sheet.querySelectorAll('[data-ctab]').forEach(x=>x.setAttribute('aria-selected',x===b));
+      $('btbox').hidden=K.connTab!=='bt';$('wifibox').hidden=K.connTab==='bt';
+      if(K.connTab==='bt'){try{NBT.start('')}catch(e){}renderBt()}});
+    $('btbox').onclick=btClick;
+    if(K.connTab==='bt'){try{NBT.start(K.link==='bt'?K.btAddr:'')}catch(e){}renderBt()}
+  }
+  renderConnectStatus();
+  if(CAN_SCAN){
+    $('scanbox').onclick=e=>{
+      if(e.target.closest('[data-scan]')){startScan();return}
+      const it=e.target.closest('[data-pick]');if(!it)return;
+      $('khost').value=it.dataset.pick;go();
+    };
+    renderScan();
+    if(K.connTab!=='bt'&&K.state!=='on'&&!K.scan.running&&!K.scan.done)startScan();   // look straight away the first time
+  } else if(!K.host)setTimeout(()=>$('khost')&&$('khost').focus(),50);
+}
+/* ---------- Bluetooth keypad panel ---------- */
+window.__kbt={update(json){let j;try{j=JSON.parse(json)}catch(e){return}
+  K.bt={state:j.state||'off',name:j.name||'',addr:j.addr||'',error:j.error||'',registered:!!j.registered};
+  if(K.bt.state==='connected'&&K.bt.addr){K.btAddr=K.bt.addr;K.btName=K.bt.name;saveK()}
+  if(K.link==='bt'){
+    const map={connected:'on',connecting:'connecting',registering:'connecting',permission:'connecting',bt_off:'connecting',ready:'off',off:'off',error:'error'};
+    const was=K.state;setK(map[K.bt.state]||'off');
+    if(K.bt.state==='connected'&&was!=='on'){K.melKnown=false;K.now=null;K.queue=[];K.status='IDLE';renderNP();toast('Bluetooth keypad connected to '+(K.bt.name||'karaoke'))}
+  }
+  if(sheetMode==='connect')renderBt();
+}};
+const BT_MSG={off:'Bluetooth keypad is off.',permission:'Allow Songbook to use Bluetooth ("Nearby devices") to continue.',bt_off:'Turn on Bluetooth to continue.',
+  registering:'Starting the Bluetooth keypad…',ready:'Ready. Tap the karaoke device below. If it isn\'t listed, pair it first.',connecting:'Connecting…',connected:'Connected as a Bluetooth keypad.'};
+function btDevices(){let l=[];try{l=JSON.parse(NBT.devices())||[]}catch(e){}
+  const rank=m=>m===0x200?0:m===0x100?1:m===0x400?2:3;   // phones, then computers/TV boxes, then audio, then others
+  return l.sort((a,b)=>rank(a.major)-rank(b.major)||String(a.name).localeCompare(String(b.name)))}
+function renderBt(){const box=$('btbox');if(!box||!NBT)return;
+  const b=K.bt,on=K.link==='bt'&&b.state==='connected';
+  const devs=btDevices();
+  const msg=b.state==='error'?b.error:b.state==='connected'?'Connected to '+(b.name||'karaoke device')+' as a Bluetooth keypad.':BT_MSG[b.state]||'';
+  let phone='';try{phone=NBT.phoneName()}catch(e){}
+  box.innerHTML=`<div class="kstat" data-s="${on?'on':b.state==='error'?'error':''}" role="status">${esc(msg)}</div>
+    <div class="scan">
+      <div class="shead"><span class="sst">Paired devices</span><button type="button" class="sbtn2" data-bt="refresh">Refresh</button></div>
+      ${devs.length?devs.map(d=>{const cur=on&&d.addr===b.addr,busy=b.state==='connecting'&&d.addr===K.btAddr;
+        return `<button type="button" class="pick${cur?' on':''}" data-btpick="${esc(d.addr)}" data-btname="${esc(d.name)}"><span class="pn">${esc(d.name||'Unnamed device')}</span><span class="pa">${esc(d.addr)}</span><span class="pgo">${cur?'Connected':busy?'Connecting…':'Connect'}</span></button>`}).join('')
+        :'<p class="help">No paired devices yet.</p>'}
+    </div>
+    <div class="acts"><button type="button" class="primary" data-bt="pair">Pair a new device</button>${on?'<button type="button" data-bt="disc">Disconnect</button>':''}<button type="button" id="close2">Close</button></div>
+    <p class="help"><b>To pair:</b> tap <b>Pair a new device</b> and allow. On the karaoke device, open <b>Bluetooth</b> settings and pair with <b>${esc(phone||'this phone')}</b>. It shows up as a keyboard. Then tap it in the list above.<br>
+    Keep SongHub's player screen open. Over Bluetooth you can Reserve, use the keypad, Play/Pause, Stop, Next, Keys, Tempo and Melody. The queue, now playing, Reserve 1st and Play now need Wi-Fi.</p>`;
+}
+function btClick(e){
+  const pk=e.target.closest('[data-btpick]');
+  if(pk){if(K.link!=='bt'){kDisconnect();K.link='bt'}K.btAddr=pk.dataset.btpick;K.btName=pk.dataset.btname;saveK();
+    K.bt.state='connecting';setK('connecting');try{NBT.connect(K.btAddr)}catch(err){}renderBt();return}
+  const a=e.target.closest('[data-bt]');
+  if(a){const w=a.dataset.bt;
+    if(w==='refresh')renderBt();
+    else if(w==='pair'){try{NBT.start('');NBT.discoverable()}catch(err){}toast('Now pair from the karaoke device\'s Bluetooth settings',3500)}
+    else if(w==='disc'){try{NBT.disconnect()}catch(err){}}
+    return}
+  if(e.target.closest('#close2'))closeSheet();
+}
+/* ---------- find SongHub on the Wi-Fi ---------- */
+// The app listens for SongHub's "SONGHUB_SERVER:<port>" beacon and checks every device on the Wi-Fi for port 48080,
+// confirming each one with SongHub's welcome message (see NativeWs.scan).
+const CAN_SCAN=!!(NWS&&NWS.scan);
+K.scan={id:0,running:false,done:false,found:[]};
+window.__kscan={
+  found(id,host,port,name,ip){if(id!==K.scan.id)return;
+    const local=host==='127.0.0.1',key=((local&&ip)?ip:host)+':'+port;
+    const ex=K.scan.found.find(f=>f.key===key);
+    if(ex){if(local&&!ex.local)Object.assign(ex,{host,local:true});}   // same SongHub seen twice: this phone
+    else K.scan.found.push({key,host,port,name:name||'SongHub',ip,local});
+    renderScan()},
+  done(id){if(id!==K.scan.id)return;K.scan.running=false;K.scan.done=true;renderScan()}};
+function startScan(){if(!CAN_SCAN||K.scan.running)return;K.scan={id:(Date.now()%1e9)|0,running:true,done:false,found:[]};
+  try{NWS.scan(K.scan.id,6000)}catch(e){K.scan.running=false;K.scan.done=true}renderScan()}
+function renderScan(){const box=$('scanbox');if(!box)return;const S=K.scan;
+  const cur=addrText();
+  const list=S.found.map(f=>{const addr=f.host+':'+f.port;const shown=f.local?'This phone'+(f.ip?' · '+f.ip:''):addr;
+    return `<button type="button" class="pick${addr===cur&&K.state==='on'?' on':''}" data-pick="${esc(addr)}"><span class="pn">${esc(f.name)}</span><span class="pa">${esc(shown)}</span><span class="pgo">${addr===cur&&K.state==='on'?'Connected':'Connect'}</span></button>`}).join('');
+  const head=S.running?`<span class="sst"><span class="spin" aria-hidden="true"></span>Searching your Wi-Fi for SongHub…</span>`
+    :S.done?`<span class="sst">${S.found.length?`Found ${S.found.length} SongHub${S.found.length>1?'s':''}`:'No SongHub found'}</span>`:'<span class="sst">Find SongHub on your Wi-Fi</span>';
+  box.innerHTML=`<div class="shead">${head}<button type="button" class="sbtn2" data-scan ${S.running?'disabled':''}>${S.done?'Scan again':'Scan'}</button></div>${list}
+    ${S.done&&!S.found.length?'<p class="help">Make sure SongHub is open with <b>Enable Remote Server</b> on, and both devices are on the same Wi-Fi. You can also type the address below.</p>':''}`;
+}
+function openQueue(){
+  if(K.link==='bt')return openConnect();   // no queue over Bluetooth
+  sheetMode='queue';
+  const items=K.queue.map((c,k)=>{const i=findSong(c);const t=i>=0?title[i]:'Song '+c,a=i>=0?ART[art[i]]:'';
+    return `<div class="qitem"><span class="pos">${k+1}</span><span class="num">${esc(String(c))}</span><span class="title">${esc(t)}</span><span class="artist">${esc(a)}</span>
+      <div class="qb"><button type="button" data-qnow="${esc(String(c))}">Play now</button><button type="button" data-qdel="${esc(String(c))}">Remove</button></div></div>`}).join('');
+  const now=K.now?`<div class="nowcard"><span class="lbl">${K.status==='paused'?'Paused':'Now playing'}</span><b>${esc(String(K.now.title||K.now.code))}</b><span class="help">${esc(String(K.now.artist||''))} · ${esc(String(K.now.code))}</span></div>`:'';
+  const scroll=sheet.querySelector('.card')?sheet.querySelector('.card').scrollTop:0;
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Karaoke queue">
+    <div class="lbl">Karaoke · ${esc(addrText())}</div>${now||'<h2>Nothing playing</h2>'}${K.now?`<div class="acts sec"><button type="button" data-tp="replay">Replay this song</button></div>`:''}<h3>Queue (${K.queue.length})</h3>
+    <div class="qlist">${items||'<p class="help">No songs reserved yet. Tap a song, then tap Reserve.</p>'}</div>
+    <div class="acts"><button id="kset" type="button">Connection</button><button class="primary" id="close" type="button">Close</button></div></div>`;
+  sheet.hidden=false;sheet.querySelector('.card').scrollTop=scroll;
+  $('close').onclick=closeSheet;$('kset').onclick=openConnect;
+  sheet.querySelectorAll('[data-qnow]').forEach(b=>b.onclick=()=>{if(!kOpen())return toast('Not connected to the karaoke');sendOp(1,b.dataset.qnow);addHistory(b.dataset.qnow,'now');toast('Playing now…')});
+  sheet.querySelectorAll('[data-qdel]').forEach(b=>b.onclick=()=>{if(!kOpen())return toast('Not connected to the karaoke');sendAct('remove',b.dataset.qdel);toast('Removed from queue')});
+}
+if(CAN_K){
+  $('conn').hidden=false;
+  $('conn').onclick=()=>K.state==='on'?openQueue():openConnect();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&K.wanted&&!kOpen()){K.retry=0;kConnect()}});
+  if(K.link==='bt'&&NBT){try{NBT.start(K.btAddr||'')}catch(e){}}
+  else{K.link='wifi';if(K.host)kConnect()}
+}
+
+function openSheet(i){
+  sheetMode='song';
+  const on=CAN_K&&kOpen();
+  const acts=on
+    ?`<div class="acts"><button class="primary" id="k-res" type="button">Reserve</button>${K.link==='bt'?'':'<button id="k-first" type="button">Reserve 1st</button><button id="k-now" type="button">Play now</button>'}</div>
+      <div class="acts sec"><button id="more" type="button">More by this artist</button><button id="copy" type="button">Copy number</button><button id="close" type="button">Close</button></div>`
+    :`<div class="acts"><button class="primary" id="copy" type="button">Copy number</button>${CAN_K?'<button id="k-conn" type="button">Connect karaoke</button>':''}<button id="more" type="button">More by this artist</button><button id="close" type="button">Close</button></div>`;
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Song number">
+    <div class="cardtop"><div class="lbl">${on?'Send to karaoke':'Enter on the remote'}</div><button type="button" class="favbig" data-fav="${i}" aria-pressed="${favSet.has(i)}" aria-label="${favSet.has(i)?'Remove from':'Add to'} Favorites">${HEART}<span class="fbl">${favSet.has(i)?'Saved':'Favorite'}</span></button></div>
+    <div class="big" id="bignum">${esc(num[i])}</div>
+    <h2>${esc(title[i])}</h2>
+    <p>${esc(ART[art[i]])} · ${esc(CAT[cat[i]])}</p>
+    ${acts}</div>`;
+  sheet.hidden=false;
+  $('close').onclick=closeSheet;
+  sheet.querySelector('.favbig').onclick=()=>toggleFav(i);
+  if(on){$('k-res').onclick=()=>kSend('res',i);if($('k-first')){$('k-first').onclick=()=>kSend('first',i);$('k-now').onclick=()=>kSend('now',i)}}
+  else if($('k-conn'))$('k-conn').onclick=openConnect;
+  $('more').onclick=()=>{closeSheet();st.mode='artist';st.artist=art[i];st.query='';q.value='';$('clear').hidden=true;refresh(true)};
+  $('copy').onclick=()=>{
+    const done=()=>toast('Copied '+num[i]);
+    const fallback=()=>{const r=document.createRange();r.selectNodeContents($('bignum'));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Number selected — tap Copy')};
+    if(window.Android&&Android.copy){try{Android.copy(num[i]);done();return}catch(e){}}
+    try{navigator.clipboard.writeText(num[i]).then(done,fallback)}catch(e){fallback()}};
+  ($('k-res')||$('copy')).focus();
+}
+function openAbout(){
+  sheetMode='about';
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="About">
+    <div class="about">
+      <div><h2>Songbook</h2><div class="ver">Version ${APP_VERSION}</div></div>
+      <p class="owner">Made by Aldrin</p>
+      <p>A karaoke songbook and Wi-Fi remote for the SongHub karaoke app.</p>
+      <div class="credit">Credits to the <b>SongHub developer</b> for the SongHub karaoke app and its remote, which this songbook works with.</div>
+      <div class="acts"><button class="primary" id="close" type="button">Close</button></div>
+    </div></div>`;
+  sheet.hidden=false;
+  $('close').onclick=closeSheet;
+}
+$('about-btn').onclick=openAbout;
+function closeSheet(){sheet.hidden=true;sheet.innerHTML='';sheetMode='';clearTimeout(kpTimer)}
+
+/* ---------- number keypad ---------- */
+let kpDigits='';
+const DEL_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 5H9L2 12l7 7h13zM18.6 15.2l-1.4 1.4-2.7-2.7-2.7 2.7-1.4-1.4 2.7-2.7-2.7-2.7 1.4-1.4 2.7 2.7 2.7-2.7 1.4 1.4-2.7 2.7z"/></svg>';
+function kpCode(){return kpDigits.padStart(6,'0')}
+function kpSong(){return kpDigits?findSong(kpCode()):-1}
+function openKeypad(){
+  sheetMode='keypad';const on=CAN_K&&kOpen();
+  sheet.innerHTML=`<div class="card kpcard" role="dialog" aria-modal="true" aria-label="Enter song number">
+    <div class="kp">
+      <div class="kpleft">
+        <div class="lbl">${on?(K.link==='bt'?'Typing on SongHub':'Song number'):'Find song by number'}</div>
+        <div class="kpdisp" id="kpdisp" aria-live="polite"></div>
+        <div class="kpsong" id="kpsong"></div>
+      </div>
+      <div class="kpright"><div class="kpgrid" role="group" aria-label="Keypad">
+        ${[1,2,3,4,5,6,7,8,9].map(d=>`<button type="button" data-kd="${d}">${d}</button>`).join('')}
+        <button type="button" class="kclr" data-kd="clr" aria-label="Clear">CLR</button>
+        <button type="button" data-kd="0">0</button>
+        <button type="button" class="kdel" data-kd="del" aria-label="Delete last digit">${DEL_ICON}</button>
+      </div></div>
+      <div class="kpacts"><div class="acts">${on
+          ?`<button class="primary" type="button" data-kp="res">Reserve</button>${K.link==='bt'?'':'<button type="button" data-kp="first">Reserve 1st</button><button type="button" data-kp="now">Play now</button>'}`
+          :`<button class="primary" type="button" data-kp="open">Show song</button>${CAN_K?'<button type="button" data-kp="conn">Connect karaoke</button>':''}`}
+          <button type="button" data-kp="close">Close</button></div></div>
+    </div></div>`;
+  sheet.hidden=false;kpRender();
+}
+function kpRender(){
+  const d=$('kpdisp');if(!d)return;
+  const pad=6-Math.min(6,kpDigits.length);
+  d.innerHTML=`<span class="ph">${'0'.repeat(pad)}</span>${esc(kpDigits)}`;
+  const i=kpSong(),sg=$('kpsong');
+  sg.innerHTML=!kpDigits?(kpCleared?'<span>SongHub cleared the number after 5 seconds. Type it again.</span>':'<span>Type the song number</span>'):i>=0?`<b>${esc(title[i])}</b><span>${esc(ART[art[i]])}</span>`:'<span>No song with this number in the songbook</span>';
+  sheet.querySelectorAll('[data-kp="res"],[data-kp="first"],[data-kp="now"]').forEach(b=>b.disabled=!kpDigits);
+  const o=sheet.querySelector('[data-kp="open"]');if(o)o.disabled=i<0;
+}
+// Over Bluetooth the keypad is live: each digit shows on SongHub's screen as you press it.
+// SongHub forgets a typed number 5 s after the last key, so Reserve retypes it after a pause.
+let kpLive=false,kpLastT=0,kpTimer=0,kpCleared=false;
+const kpBtLive=()=>K.link==='bt'&&kOpen();
+// mirror SongHub: it forgets the typed number 5 s after the last key, so the keypad here clears too
+function kpArmTimeout(){clearTimeout(kpTimer);if(!kpDigits)return;
+  kpTimer=setTimeout(()=>{if(sheetMode==='keypad'&&K.link==='bt'&&kpLive&&kpDigits){kpDigits='';kpLive=false;kpCleared=true;kpRender()}},5000)}
+function kpPress(k){
+  const before=kpDigits;
+  if(k==='clr')kpDigits='';else if(k==='del')kpDigits=kpDigits.slice(0,-1);
+  else if(kpDigits.length<6)kpDigits+=k;
+  kpCleared=false;
+  if(kpBtLive()&&kpDigits!==before){
+    try{
+      if(k==='clr')btKeys(Array(Math.max(before.length,1)).fill('bksp'));
+      // ⌫: SongHub keeps only the last 6 digits typed, so retyping the rest padded to 6 replaces the number
+      // (1234 → ⌫ sends 000123). This avoids Backspace, which some phones treat as "clear all".
+      else if(k==='del')btKeys(kpDigits?kpDigits.padStart(6,'0').split(''):Array(6).fill('bksp'));
+      else{if(!kpLive||Date.now()-kpLastT>4500)btKeys([...btClear(),...kpDigits.split('')]);else btKeys([k])}
+      kpLive=kpDigits.length>0;kpLastT=Date.now();kpArmTimeout();
+    }catch(e){toast('Could not send. Check the Bluetooth keypad connection.')}
+  }
+  kpRender();
+}
+function kpAction(a){
+  if(a==='close')return closeSheet();
+  if(a==='conn')return openConnect();
+  const i=kpSong();
+  if(a==='open'){if(i>=0){openSheet(i)}return}
+  if(!kpDigits)return;
+  if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
+  const code=i>=0?num[i]:kpCode(),name=i>=0?title[i]:'song '+code;
+  try{if(a==='now')sendOp(1,code);else if(a==='first')sendAct('priority',code);
+    else if(kpBtLive()&&kpLive&&Date.now()-kpLastT<4500)btKeys(['enter']);   // number is already on SongHub's screen
+    else sendOp(2,code)}catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.');return}
+  K.pending={kind:a,code,title:name,at:Date.now()};addHistory(code,a);
+  toast(K.link==='bt'?'Sent to SongHub: '+name:a==='now'?'Playing '+name+'…':a==='first'?'Reserved first: '+name:'Reserved: '+name);
+  kpLive=false;clearTimeout(kpTimer);
+  if(a==='now')closeSheet();else{kpDigits='';kpRender()}   // ready for the next number
+}
+$('kpbtn').onclick=()=>{kpDigits='';kpLive=false;kpCleared=false;clearTimeout(kpTimer);openKeypad()};
+sheet.addEventListener('click',e=>{if(sheetMode!=='keypad')return;
+  const d=e.target.closest('[data-kd]');if(d){kpPress(d.dataset.kd);return}
+  const a=e.target.closest('[data-kp]');if(a&&!a.disabled)kpAction(a.dataset.kp)});
+document.addEventListener('keydown',e=>{if(sheetMode!=='keypad')return;
+  if(/^[0-9]$/.test(e.key)){kpPress(e.key);e.preventDefault()}else if(e.key==='Backspace'){kpPress('del');e.preventDefault()}
+  else if(e.key==='Enter'){kpAction(kOpen()?'res':'open');e.preventDefault()}});
+sheet.addEventListener('click',e=>{if(e.target===sheet)closeSheet()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)closeSheet()});
+
+// Android back button: close the number card, leave an artist, clear search, then exit
+window.__back=function(){
+  if(!sheet.hidden){closeSheet();return}
+  if(K.panel){K.panel='';K.melFix=false;renderNP();return}
+  if(st.mode==='artist'&&st.artist>=0){st.artist=-1;refresh(true);return}
+  if(st.query){q.value='';st.query='';$('clear').hidden=true;refresh(true);return}
+  if(st.mode!=='alpha'){st.mode='alpha';refresh(true);return}
+  if(window.Android&&Android.exit)Android.exit();
+};
+
+refresh(true);
+})();
+</script>

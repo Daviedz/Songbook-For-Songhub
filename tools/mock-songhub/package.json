@@ -1,0 +1,1 @@
+{ "name": "mock-songhub", "private": true, "description": "Fake SongHub remote server for testing the Songbook", "dependencies": { "ws": "8.18.0" } }

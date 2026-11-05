@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <style name="AppTheme" parent="@android:style/Theme.DeviceDefault.DayNight">
+    <item name="android:windowActionBar">false</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:statusBarColor">#ff2a1f4d</item>
+    <item name="android:navigationBarColor">#ff2a1f4d</item>
+  </style>
+</resources>
