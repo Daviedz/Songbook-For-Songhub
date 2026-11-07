@@ -15,7 +15,7 @@ A karaoke songbook for Android phones and tablets that works as a remote for the
 - **Song list:** browse A–Z with a letter strip, by artist, Favorites or History. Search by title, artist or song number, and sort by title or by number.
 - **Favorites:** tap the heart on any song. **History** lists songs you reserved or played and songs SongHub played, so you can reserve them again.
 - **Number keypad:** type a song number and see the matching song before you send it.
-- **Remote control:** Reserve, Reserve 1st, Play now, Play/Pause, Stop, Next, Replay, Keys, Tempo and Melody (Off, 20, 40, 60, 80, Max), plus a live queue and now-playing display.
+- **Remote control:** Reserve, Reserve 1st and Play now, plus a control row of Play/Pause, Next, BGV (change background), Stop, Melody (Off, 20, 40, 60, 80, Max), Tempo and Keys. Also Replay, a live queue and a now-playing display.
 - **Layouts:** portrait, landscape split view (controls on the left, songs on the right) and tablet table view. Large text sizes are supported, and it follows dark mode.
 - **Offline:** the song list and fonts are inside the app.
 
@@ -43,7 +43,7 @@ The phone registers as a Bluetooth keyboard, which SongHub's player responds to.
 3. Back in the Songbook, tap the SongHub device in **Paired devices**.
 4. Keep SongHub's **player screen** open.
 
-Over Bluetooth you can Reserve, use the live keypad, Play/Pause, Stop, Next, Keys, Tempo and Melody. Bluetooth only sends keys and nothing comes back, so the queue, now playing, Reserve 1st, Play now and Replay need Wi-Fi. A "Songbook keypad" notification keeps the connection alive in the background.
+Over Bluetooth you can Reserve, use the live keypad, Play/Pause, Next, BGV, Stop, Melody, Tempo and Keys. Bluetooth only sends keys and nothing comes back, so the queue, now playing, Reserve 1st, Play now and Replay need Wi-Fi. A "Songbook keypad" notification keeps the connection alive in the background.
 
 If pairing fails with "incorrect PIN" after swapping which phone is the keypad, forget the pairing on **both** phones and pair again.
 
@@ -57,7 +57,7 @@ If pairing fails with "incorrect PIN" after swapping which phone is the keypad, 
 | Play/Pause | binary `[0]` |
 | Key ± / Tempo ± | binary `[4, ±1]` / `[5, ±1]` |
 | Reserve 1st, Remove | `{"action":"priority"\|"remove","payload":"<number>"}` |
-| Next, Stop, Replay, Melody | `{"action":"next"\|"stop"\|"replay"\|"melody"}` |
+| Next, Stop, Replay, Melody, BGV | `{"action":"next"\|"stop"\|"replay"\|"melody"\|"bgv"}` |
 
 SongHub sends `{"type":"state_update", "queue":[…], "status", "now_playing", "transpose", "tempo", "melody"}`, which drives the queue and the real key, tempo and melody values. **Scan** listens for SongHub's UDP beacon (`SONGHUB_SERVER:<port>` on 48080), checks the local network for port 48080, and confirms each device with SongHub's `welcome` message.
 
@@ -70,7 +70,7 @@ SongHub sends `{"type":"state_update", "queue":[…], "status", "now_playing", "
 | Delete one digit | retypes the rest padded to 6 digits (e.g. 1234 → `000123`) |
 | Clear | Backspace |
 | Play/Pause, Stop, Next | Media keys |
-| Melody / Key − + / Tempo − + | F2 / F3 F4 / F5 F6 |
+| Melody / Key − + / Tempo − + / BGV | F2 / F3 F4 / F5 F6 / F7 |
 
 Back/Esc is never sent, because SongHub uses it to exit the player.
 

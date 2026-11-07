@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
  * Makes the phone act as a Bluetooth keyboard (HID device) that SongHub's player reacts to.
  * SongHub keys (from its PlayerActivity.dispatchKeyEvent):
  *   0-9 type the song number, Enter reserves it, Backspace deletes a digit,
- *   Media Play/Pause, Media Stop, Media Next, F2 melody, F3/F4 key -/+, F5/F6 tempo -/+.
+ *   Media Play/Pause, Media Stop, Media Next, F2 melody, F3/F4 key -/+, F5/F6 tempo -/+, F7 background (BGV).
  *   Back/Esc is never sent: SongHub uses it to exit the player.
  * JS: AndroidBt.available(), start(addr), devices(), connect(addr), disconnect(), stop(),
  *     discoverable(), send("1,2,enter"), phoneName().  Callback: window.__kbt.update(jsonString)
@@ -279,6 +279,7 @@ public class BtKeypad {
         if (k.equals("f4")) return new int[]{1, 0x3D};
         if (k.equals("f5")) return new int[]{1, 0x3E};
         if (k.equals("f6")) return new int[]{1, 0x3F};
+        if (k.equals("f7")) return new int[]{1, 0x40};   // SongHub: change background (BGV)
         if (k.equals("playpause")) return new int[]{2, 0xCD};
         if (k.equals("stop")) return new int[]{2, 0xB7};
         if (k.equals("next")) return new int[]{2, 0xB5};

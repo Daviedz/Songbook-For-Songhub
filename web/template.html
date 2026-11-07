@@ -221,7 +221,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
 .conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{background:var(--warn)}
 @media (prefers-reduced-motion:no-preference){.conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}}
 .np{flex:none;display:flex;flex-direction:column;width:100%;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--surface);color:var(--fg)}
-.ctl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;padding-block:0 8px}
+.ctl{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;padding-block:0 8px}
 .ctl button{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 2px;min-height:54px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;cursor:pointer}
 .ctl button span{font-size:calc(.7rem * var(--fs,1));font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .ctl button .v{font-family:var(--f-num);font-size:calc(1rem * var(--fs,1));line-height:1.1;color:var(--num);white-space:nowrap;max-width:100%;overflow:hidden}
@@ -623,7 +623,7 @@ function kConnect(){
 function kDisconnect(){K.wanted=false;K.everOn=false;clearTimeout(K.timer);const w=K.ws;K.ws=null;try{w&&w.close()}catch(e){}K.queue=[];K.now=null;setK('off')}
 function sendOp(op,code){if(K.link==='bt'){if(op===2)return btKeys([...btClear(),...btDigits(code),'enter']);if(op===0)return btKeys(['playpause']);throw BT_ONLY}const b=new TextEncoder().encode(code);const a=new Uint8Array(b.length+1);a[0]=op;a.set(b,1);K.ws.send(a.buffer)}
 function sendInt(op,v){if(K.link==='bt'){if(op===4)return btKeys([v>0?'f4':'f3']);if(op===5)return btKeys([v>0?'f6':'f5']);throw BT_ONLY}K.ws.send(new Uint8Array([op,v&255]).buffer)}
-function sendAct(action,payload){if(K.link==='bt'){const m={next:'next',stop:'stop',melody:'f2'}[action];if(!m)throw BT_ONLY;return btKeys([m])}K.ws.send(JSON.stringify(payload==null?{action}:{action,payload:String(payload)}))}
+function sendAct(action,payload){if(K.link==='bt'){const m={next:'next',stop:'stop',melody:'f2',bgv:'f7'}[action];if(!m)throw BT_ONLY;return btKeys([m])}K.ws.send(JSON.stringify(payload==null?{action}:{action,payload:String(payload)}))}
 const K_LABEL={off:'Connect karaoke',connecting:'Connecting…',on:'Connected',retry:'Reconnecting…',error:'Not connected'};
 const K_LABEL_BT={off:'Connect karaoke',connecting:'Connecting…',on:'Connected (BT)',retry:'Connecting…',error:'Not connected'};
 function setK(s){K.state=s;const c=$('conn');c.dataset.s=s;$('conn-t').textContent=(K.link==='bt'?K_LABEL_BT:K_LABEL)[s];renderNP();if(sheetMode==='connect'){if(K.link==='bt')renderBt();else{renderConnectStatus();renderScan()}}}
@@ -640,7 +640,8 @@ const ICON={
   play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
   pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
   stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
-  next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg>'};
+  next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg>',
+  bgv:'<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3 5h18v14H3zm2 2v10h14V7z"/><path d="M6.5 15.5l3.2-4 2.3 2.8 2.2-2.8 3.3 4z"/><circle cx="15.5" cy="9.3" r="1.3"/></svg>'};
 const isPlaying=()=>{const s=String(K.status).toLowerCase();return s!=='idle'&&s!=='paused'&&s!==''&&s!=='stopped'};
 const fmtAdj=v=>v>0?'+'+v:String(v);
 // Melody: SongHub steps Off → 20 → 40 → 60 → 80 → Max on each "melody" command, then back to Off.
@@ -652,12 +653,13 @@ K.panel='';K.melFix=false;K.melKnown=false;let melWait=null;
 // Row of controls under the song bar (Tempo · Keys · Melody · Start/Pause · Stop · Next)
 function ctlHTML(){const pl=isPlaying();const on=w=>K.panel===w?' aria-expanded="true"':' aria-expanded="false"';
   return `<div class="ctl gut" role="group" aria-label="Karaoke controls">
-   <button type="button" data-panel="tempo"${on('tempo')}><b class="v">${fmtAdj(K.adj.tempo)}</b><span>Tempo</span></button>
-   <button type="button" data-panel="key"${on('key')}><b class="v">${fmtAdj(K.adj.key)}</b><span>Keys</span></button>
-   <button type="button" data-panel="melody"${on('melody')}><b class="v">${MEL[K.mel]}</b><span>Melody</span></button>
    <button type="button" class="pp" data-tp="pp">${K.link==='bt'?ICON.play:pl?ICON.pause:ICON.play}<span>${K.link==='bt'?'Play/Pause':pl?'Pause':'Start'}</span></button>
+   <button type="button" data-tp="next">${ICON.next}<span>Next</span></button>
+   <button type="button" data-tp="bgv" aria-label="Change background">${ICON.bgv}<span>BGV</span></button>
    <button type="button" data-tp="stop">${ICON.stop}<span>Stop</span></button>
-   <button type="button" data-tp="next">${ICON.next}<span>Next</span></button></div>`}
+   <button type="button" data-panel="melody"${on('melody')}><b class="v">${MEL[K.mel]}</b><span>Melody</span></button>
+   <button type="button" data-panel="tempo"${on('tempo')}><b class="v">${fmtAdj(K.adj.tempo)}</b><span>Tempo</span></button>
+   <button type="button" data-panel="key"${on('key')}><b class="v">${fmtAdj(K.adj.key)}</b><span>Keys</span></button></div>`}
 function panelHTML(){
   if(K.panel==='tempo'||K.panel==='key'){const n=K.panel,L=n==='key'?'Keys':'Tempo';
     return `<div class="panel gut"><span class="pl">${L}</span>
@@ -683,7 +685,7 @@ function kTransport(what){
     if(what==='pp'){const was=isPlaying();sendOp(0,'');
       if(K.link!=='bt'&&(K.now||was)){K.status=was?'paused':'playing';renderNP();if(sheetMode==='queue')openQueue()}  // flip right away; the next state update confirms
       toast(K.link==='bt'?'Play/Pause':was?'Paused':'Start');}
-    else{sendAct(what,null);toast(what==='next'?'Next song':what==='stop'?'Stopped':'Replaying song')}
+    else{sendAct(what,null);toast(what==='next'?'Next song':what==='stop'?'Stopped':what==='bgv'?'Background changed':'Replaying song')}
   }catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.')}
 }
 // Key = binary [4,±1], Tempo = binary [5,±1] — same as SongHub's official remote. Counts are taps since the song started.
