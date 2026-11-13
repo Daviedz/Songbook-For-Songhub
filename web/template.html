@@ -55,6 +55,15 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .kpgrid button:active{transform:scale(.95);background:var(--line)}
 .kpgrid .kclr{color:var(--accent);font-size:1rem;font-family:var(--f-body)}
 .kpgrid .kdel svg{width:26px;height:26px;fill:currentColor}
+/* colourful keypad: every key has its own hue (--h), tinted so it reads in light and dark themes */
+.kpgrid button[data-kd]{border-color:hsl(var(--h,200) 72% 52% / .7);background:hsl(var(--h,200) 80% 55% / .22)}
+.kpgrid button[data-kd]:active{background:hsl(var(--h,200) 80% 55% / .5)}
+.kpgrid [data-kd="1"]{--h:350}.kpgrid [data-kd="2"]{--h:22}.kpgrid [data-kd="3"]{--h:42}
+.kpgrid [data-kd="4"]{--h:95}.kpgrid [data-kd="5"]{--h:150}.kpgrid [data-kd="6"]{--h:180}
+.kpgrid [data-kd="7"]{--h:205}.kpgrid [data-kd="8"]{--h:250}.kpgrid [data-kd="9"]{--h:290}
+.kpgrid [data-kd="0"]{--h:165}
+.kpgrid .kclr{--h:0;color:hsl(0 78% 58%)}
+.kpgrid .kdel{--h:38;color:hsl(38 92% 50%)}
 .kp .acts button:disabled{opacity:.45;cursor:default}
 @media (orientation:landscape) and (max-height:640px){
   .card.kpcard{max-width:780px}
@@ -228,7 +237,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
 .conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{background:var(--warn)}
 @media (prefers-reduced-motion:no-preference){.conn[data-s="connecting"] .dot,.conn[data-s="retry"] .dot{animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}}
 .np{flex:none;display:flex;flex-direction:column;width:100%;box-sizing:border-box;border-bottom:1px solid var(--line);background:var(--surface);color:var(--fg)}
-.ctl{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;padding-block:0 8px}
+.ctl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding-block:0 8px}
 .ctl button{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 2px;min-height:54px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;cursor:pointer}
 .ctl button span{font-size:calc(.7rem * var(--fs,1));font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .ctl button .v{font-family:var(--f-num);font-size:calc(1rem * var(--fs,1));line-height:1.1;color:var(--num);white-space:nowrap;max-width:100%;overflow:hidden}
