@@ -113,6 +113,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .updrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .updrow button{font:inherit;font-weight:700;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
 .updrow span{color:var(--muted);font-size:.9rem}
+.bk{width:100%;box-sizing:border-box;min-height:110px;font-family:var(--f-num);font-size:.78rem;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);resize:vertical}
 .updnotes{white-space:pre-wrap;max-height:34vh;overflow:auto;font-size:.92rem}
 .bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
@@ -918,13 +919,81 @@ function openAbout(){
       <p>A karaoke songbook and Wi-Fi remote for the SongHub karaoke app.</p>
       <div class="credit">Credits to the <b>SongHub developer</b> for the SongHub karaoke app and its remote, which this songbook works with.</div>
       <div class="updrow"><button id="chk-upd" type="button">Check for updates</button><span id="upd-st" role="status"></span></div>
+      <div class="updrow"><button id="bk-save" type="button">Back up favorites</button><button id="bk-load" type="button">Restore</button></div>
       <div class="acts"><button class="primary" id="close" type="button">Close</button></div>
     </div></div>`;
   sheet.hidden=false;
   $('close').onclick=closeSheet;
   $('chk-upd').onclick=()=>checkUpdate(true);
+  $('bk-save').onclick=openBackup;
+  $('bk-load').onclick=openRestore;
 }
 $('about-btn').onclick=openAbout;
+
+/* ---------- backup / restore of favorites and history ---------- */
+// A backup is one line of text ("SBK1:...") you can copy into Notes or WhatsApp and paste back into any Songbook.
+function backupCode(){
+  let f=[],h=[];
+  try{f=JSON.parse(localStorage.getItem('songbook-favs')||'[]')||[]}catch(e){}
+  try{h=(JSON.parse(localStorage.getItem('songbook-history')||'[]')||[]).filter(x=>x&&x.c)}catch(e){}
+  return 'SBK1:'+btoa(unescape(encodeURIComponent(JSON.stringify({f,h}))));
+}
+function copyText(t,done){
+  if(window.Android&&Android.copy){try{Android.copy(t);done();return}catch(e){}}
+  try{navigator.clipboard.writeText(t).then(done,()=>toast('Select the text and copy it'))}catch(e){toast('Select the text and copy it')}
+}
+function openBackup(){
+  const code=backupCode();
+  sheetMode='backup';
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Back up favorites">
+    <div class="about">
+      <div><h2>Back up</h2><div class="ver">${favSet.size} favorites, ${HIST.length} history entries</div></div>
+      <p>Copy this code and keep it somewhere safe (Notes, WhatsApp to yourself). Use <b>Restore</b> on any Songbook to bring everything back.</p>
+      <textarea class="bk" id="bk-text" readonly></textarea>
+      <div class="acts"><button id="bk-close" type="button">Close</button><button class="primary" id="bk-copy" type="button">Copy code</button></div>
+    </div></div>`;
+  $('bk-text').value=code;
+  sheet.hidden=false;
+  $('bk-close').onclick=closeSheet;
+  $('bk-copy').onclick=()=>copyText(code,()=>toast('Backup code copied'));
+  $('bk-text').onfocus=()=>$('bk-text').select();
+}
+function openRestore(){
+  sheetMode='restore';
+  sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Restore favorites">
+    <div class="about">
+      <div><h2>Restore</h2><div class="ver">Paste a backup code</div></div>
+      <p>Favorites and history from the code are added to what you already have.</p>
+      <textarea class="bk" id="bk-in" placeholder="SBK1:..."></textarea>
+      <p id="bk-msg" role="status"></p>
+      <div class="acts"><button id="bk-close" type="button">Cancel</button><button class="primary" id="bk-go" type="button">Restore</button></div>
+    </div></div>`;
+  sheet.hidden=false;
+  $('bk-close').onclick=closeSheet;
+  $('bk-go').onclick=()=>{
+    const msg=$('bk-msg');
+    let d;
+    try{
+      const raw=$('bk-in').value.trim();
+      if(!raw.startsWith('SBK1:'))throw 0;
+      d=JSON.parse(decodeURIComponent(escape(atob(raw.slice(5).replace(/\s+/g,'')))));
+      if(!d||!Array.isArray(d.f)||!Array.isArray(d.h))throw 0;
+    }catch(e){msg.textContent="That isn't a valid backup code.";return}
+    let f=[],h=[];
+    try{f=JSON.parse(localStorage.getItem('songbook-favs')||'[]')||[]}catch(e){}
+    try{h=JSON.parse(localStorage.getItem('songbook-history')||'[]')||[]}catch(e){}
+    const favs=[...new Set([...f,...d.f].map(String))];
+    const seen=new Set(),hist=[];
+    for(const x of [...h,...d.h]){if(x&&x.c&&!seen.has(String(x.c))){seen.add(String(x.c));hist.push(x)}}
+    hist.length=Math.min(hist.length,300);
+    try{
+      localStorage.setItem('songbook-favs',JSON.stringify(favs));
+      localStorage.setItem('songbook-history',JSON.stringify(hist));
+    }catch(e){msg.textContent="Couldn't save: "+e;return}
+    msg.textContent='Restored '+d.f.length+' favorites and '+d.h.length+' history entries. Reloading...';
+    setTimeout(()=>location.reload(),700);
+  };
+}
 
 /* ---------- app updates (GitHub releases) ---------- */
 const UPD_REPO='Daviedz/Songbook-For-Songhub';

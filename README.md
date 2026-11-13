@@ -18,10 +18,14 @@ A karaoke songbook for Android phones and tablets that works as a remote for the
 - **Remote control:** Reserve, Reserve 1st and Play now, plus a control row of Play/Pause, Next, BGV (change background), Stop, Melody (Off, 20, 40, 60, 80, Max), Tempo and Keys. Also Replay, a live queue and a now-playing display.
 - **Layouts:** portrait, landscape split view (controls on the left, songs on the right) and tablet table view. Large text sizes are supported, and it follows dark mode.
 - **Offline:** the song list and fonts are inside the app.
+- **Updates:** the app checks this page for a newer release (at start, and under **About > Check for updates**) and installs it for you.
+- **Backup:** **About > Back up favorites** gives you one line of text with your Favorites and History; **Restore** brings it back on any phone.
 
 ## Install
 
 Download the APK from [Releases](../../releases), copy it to your phone and tap it to install. Allow installs from that app if Android asks. It needs Android 5.0 or newer; the Bluetooth keypad needs Android 9 or newer.
+
+**Upgrading from v3.3 or older:** v3.4 is signed with a new key and has a new app ID (`com.daviedz.songbook`), so it installs **next to** the old Songbook instead of replacing it (Android can't update an app signed with a different key). Your old Favorites and History stay in the old app; re-add them in the new one, then uninstall the old app. From v3.4 on, updates install over the top and keep your data.
 
 On Xiaomi phones with a China ROM, the installer may warn "Couldn't find ICP registration info". That's Xiaomi's check for apps registered in China. Tap **Install** to continue.
 
