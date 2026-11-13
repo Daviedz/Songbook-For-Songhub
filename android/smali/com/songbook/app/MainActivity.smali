@@ -33,6 +33,10 @@
     invoke-direct {v3, p0, v0}, Lcom/songbook/app/BtKeypad;-><init>(Landroid/app/Activity;Landroid/webkit/WebView;)V
     const-string v4, "AndroidBt"
     invoke-virtual {v0, v3, v4}, Landroid/webkit/WebView;->addJavascriptInterface(Ljava/lang/Object;Ljava/lang/String;)V
+    new-instance v3, Lcom/songbook/app/Updater;
+    invoke-direct {v3, p0, v0}, Lcom/songbook/app/Updater;-><init>(Landroid/app/Activity;Landroid/webkit/WebView;)V
+    const-string v4, "AndroidUp"
+    invoke-virtual {v0, v3, v4}, Landroid/webkit/WebView;->addJavascriptInterface(Ljava/lang/Object;Ljava/lang/String;)V
     invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
     const-string v4, "file:///android_asset/index.html"
     invoke-virtual {v0, v4}, Landroid/webkit/WebView;->loadUrl(Ljava/lang/String;)V
