@@ -14,8 +14,8 @@ A karaoke songbook for Android phones and tablets that works as a remote for the
 
 - **Song list:** browse A–Z with a letter strip, by artist, Favorites or History. Search by title, artist or song number, and sort by title or by number.
 - **Favorites:** tap the heart on any song. **History** lists songs you reserved or played and songs SongHub played, so you can reserve them again.
-- **Number keypad:** type a song number and see the matching song before you send it.
-- **Remote control:** Reserve, Reserve 1st and Play now, plus a control row of Play/Pause, Next, BGV (change background), Stop, Melody (Off, 20, 40, 60, 80, Max), Tempo and Keys. Also Replay, a live queue and a now-playing display.
+- **Number keypad:** type a song number and see the matching song before you send it. With SongHub 5.x each digit also shows on SongHub's screen as you type it (live typing).
+- **Remote control:** Reserve, Reserve 1st and Play now, plus a control row of Play/Pause, Next, BGV (change background), Stop, Melody (Off, 20, 40, 60, 80, Max), Tempo and Keys. Also Replay, a **More** panel with MPX (vocal), PROJ (projector) and MODE, a live queue and a now-playing display.
 - **Layouts:** portrait, landscape split view (controls on the left, songs on the right) and tablet table view. Large text sizes are supported, and it follows dark mode.
 - **Offline:** the song list and fonts are inside the app.
 - **Updates:** the app checks this page for a newer release (at start, and under **About > Check for updates**) and installs it for you.
@@ -37,6 +37,14 @@ On Xiaomi phones with a China ROM, the installer may warn "Couldn't find ICP reg
 2. In the Songbook, tap **Connect karaoke**. The **Wi-Fi** tab scans your network and lists every SongHub it finds; tap **Connect**. You can also type the address SongHub shows, for example `192.168.1.28:48080`.
 
 Both devices must be on the same Wi-Fi, or one phone's hotspot. Don't set SongHub's Server Port to 48081: SongHub always uses that port for its browser remote page.
+
+### Bluetooth remote (SongHub 5.xx / SongHub PC 2.xx)
+
+SongHub 5 can also be controlled over a Bluetooth data link instead of Wi-Fi, with the same features: queue, now playing, Reserve 1st, Play now and all controls.
+
+1. In SongHub, turn on its Bluetooth remote.
+2. Pair the phone with the SongHub device in Android's Bluetooth settings.
+3. In the Songbook, tap **Connect karaoke → Bluetooth → SongHub 5 remote** and tap the device in **Paired devices**.
 
 ### Bluetooth keypad
 
@@ -65,7 +73,11 @@ If pairing fails with "incorrect PIN" after swapping which phone is the keypad, 
 
 SongHub sends `{"type":"state_update", "queue":[…], "status", "now_playing", "transpose", "tempo", "melody"}`, which drives the queue and the real key, tempo and melody values. **Scan** listens for SongHub's UDP beacon (`SONGHUB_SERVER:<port>` on 48080), checks the local network for port 48080, and confirms each device with SongHub's `welcome` message.
 
-**Bluetooth** (HID keyboard plus consumer keys, as SongHub's player expects):
+**Live typing (SongHub 5.x), Wi-Fi and Bluetooth remote:** binary `[11, digit]` for each digit, `[12]` for backspace, `[13]` to clear the typed number. More actions: `{"action":"mpxch"|"projector"|"toggle_mode"}`.
+
+**Bluetooth remote** (RFCOMM, service UUID `5f0d7b6a-3c1e-4a8f-9b52-0c6e8d4a1f37`): the same messages as Wi-Fi, framed as `[type:1][length:4, big endian][payload]` with type 0 = JSON text and type 1 = binary.
+
+**Bluetooth keypad** (HID keyboard plus consumer keys, as SongHub's player expects):
 
 | Action | Key |
 |---|---|
@@ -101,7 +113,7 @@ To change the version, edit `versionCode` and `versionName` in `android/apktool.
 | `scripts/build_data.py` | Converts the song list to compact JSON. |
 | `scripts/make_page.py` | Builds `android/assets/index.html` with bundled fonts and the version. |
 | `android/` | Apktool project: manifest, resources, fonts, and the small `MainActivity` and `Bridge` in smali. |
-| `native/src/` | Java: `NativeWs` (Wi-Fi WebSocket and SongHub scan), `BtKeypad` (Bluetooth HID keyboard), `KeypadService` (keeps the keypad alive in the background). |
+| `native/src/` | Java: `NativeWs` (Wi-Fi WebSocket and SongHub scan), `BtRemote` (SongHub 5 Bluetooth remote), `BtKeypad` (Bluetooth HID keyboard), `Updater` (in-app updates), `KeypadService` (keeps the keypad alive in the background). |
 | `native/stubs/` | Android API signatures used only to compile the Java. They aren't shipped. |
 | `native/fake/`, `native/test/` | Desktop tests of the Java code with simulated Android classes. |
 | `tools/mock-songhub/` | Fake SongHub servers (`npm install`, then `node server.js`) for testing on a computer. |

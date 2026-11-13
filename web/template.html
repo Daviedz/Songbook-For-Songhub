@@ -574,7 +574,7 @@ function toast(msg,ms,act){document.querySelectorAll('.toast').forEach(t=>t.remo
 // Remove from queue = {"action":"remove","payload":number}; host pushes {"type":"state_update","queue":[...],"status":..,"now_playing":{..}}
 const CAN_K=location.protocol==='file:'||location.protocol==='http:';
 const K={adj:{key:0,tempo:0,code:null},ws:null,host:'',port:48080,state:'off',queue:[],now:null,status:'IDLE',retry:0,timer:0,wanted:false,everOn:false,pending:null};
-try{const s=JSON.parse(localStorage.getItem('songbook-karaoke')||'{}');K.host=s.host||'';K.port=s.port||48080;K.link=s.link==='bt'?'bt':'wifi';K.btAddr=s.bt||'';K.btName=s.btName||''}catch(e){K.link='wifi'}
+try{const s=JSON.parse(localStorage.getItem('songbook-karaoke')||'{}');K.host=s.host||'';K.port=s.port||48080;K.link=s.link==='bt'?'bt':s.link==='bts'?'bts':'wifi';K.btAddr=s.bt||'';K.btName=s.btName||'';K.btMode=s.btm==='hid'?'hid':'rf'}catch(e){K.link='wifi'}
 const byCode=new Map(), byNorm=new Map();
 const norm=c=>String(c).trim().replace(/^0+(?=\d)/,'');
 for(let i=0;i<N;i++){byCode.set(num[i],i);byNorm.set(norm(num[i]),i)}
@@ -587,7 +587,7 @@ function kOpen(){return K.link==='bt'?K.bt.state==='connected':!!(K.ws&&K.ws.rea
    F2 melody step, F3/F4 key -/+, F5/F6 tempo -/+. Nothing comes back over Bluetooth, so there's no queue
    or now-playing info, and Reserve 1st / Play now / Replay / Remove aren't available. */
 let NBT=null;try{if(window.AndroidBt&&AndroidBt.available())NBT=window.AndroidBt}catch(e){}
-K.bt={state:'off',name:'',addr:'',error:''};K.connTab=K.link;
+K.btMode=K.btMode||'rf';K.bt={state:'off',name:'',addr:'',error:''};K.connTab=K.link==='wifi'?'wifi':'bt';
 const BT_ONLY=new Error('Not available over Bluetooth');
 function btKeys(list){if(!list.length)return;if(!NBT||K.bt.state!=='connected')throw new Error('Bluetooth keypad not connected');if(!NBT.send(list.join(',')))throw new Error('Bluetooth send failed');K.btLastT=Date.now()}
 // SongHub drops typed digits 5 s after the last key, so only clear old digits if we typed recently
@@ -607,12 +607,21 @@ class NativeSocket{
     const ok=typeof d==='string'?NWS.sendText(this.id,d):NWS.sendBytes(this.id,Array.from(new Uint8Array(d)).join(','));
     if(!ok)throw Error('send failed')}
   close(){if(this.readyState>=2)return;this.readyState=2;NWS.close(this.id)}}
+// SongHub 5.x Bluetooth remote: same messages as the Wi-Fi remote over an RFCOMM link (see BtRemote.java)
+const NBR=window.AndroidBr||null;
+const HAS_BT=!!(NBT||NBR);
+class BtSocket{
+  constructor(addr){this.id=++nwsId;this.readyState=0;this.binaryType='arraybuffer';__kws.map.set(this.id,this);NBR.connect(this.id,addr)}
+  send(d){if(this.readyState!==1)throw Error('not open');
+    const ok=typeof d==='string'?NBR.sendText(this.id,d):NBR.sendBytes(this.id,Array.from(new Uint8Array(d)).join(','));
+    if(!ok)throw Error('send failed')}
+  close(){if(this.readyState>=2)return;this.readyState=2;NBR.close(this.id)}}
 function kConnect(){
   if(K.link==='bt')return;
-  clearTimeout(K.timer);if(!K.host)return;
+  clearTimeout(K.timer);if(K.link==='bts'?!(NBR&&K.btAddr):!K.host)return;
   const old=K.ws;K.ws=null;try{old&&old.close()}catch(e){}
   K.wanted=true;setK(K.everOn?'retry':'connecting');
-  let ws;try{ws=NWS?new NativeSocket(K.host,K.port):new WebSocket('ws://'+K.host+':'+K.port)}catch(e){K.wanted=false;setK('error');return}
+  let ws;try{ws=K.link==='bts'?new BtSocket(K.btAddr):NWS?new NativeSocket(K.host,K.port):new WebSocket('ws://'+K.host+':'+K.port)}catch(e){K.wanted=false;setK('error');return}
   ws.binaryType='arraybuffer';K.ws=ws;
   ws.onopen=()=>{if(K.ws!==ws)return;K.retry=0;K.everOn=true;K.lastErr='';setK('on')};
   ws.onmessage=e=>{if(K.ws!==ws||typeof e.data!=='string')return;let j;try{j=JSON.parse(e.data)}catch(_){return}
@@ -629,11 +638,12 @@ function kConnect(){
 }
 function kDisconnect(){K.wanted=false;K.everOn=false;clearTimeout(K.timer);const w=K.ws;K.ws=null;try{w&&w.close()}catch(e){}K.queue=[];K.now=null;setK('off')}
 function sendOp(op,code){if(K.link==='bt'){if(op===2)return btKeys([...btClear(),...btDigits(code),'enter']);if(op===0)return btKeys(['playpause']);throw BT_ONLY}const b=new TextEncoder().encode(code);const a=new Uint8Array(b.length+1);a[0]=op;a.set(b,1);K.ws.send(a.buffer)}
+function wsRaw(a){K.ws.send(new Uint8Array(a).buffer)}
 function sendInt(op,v){if(K.link==='bt'){if(op===4)return btKeys([v>0?'f4':'f3']);if(op===5)return btKeys([v>0?'f6':'f5']);throw BT_ONLY}K.ws.send(new Uint8Array([op,v&255]).buffer)}
 function sendAct(action,payload){if(K.link==='bt'){const m={next:'next',stop:'stop',melody:'f2',bgv:'f7'}[action];if(!m)throw BT_ONLY;return btKeys([m])}K.ws.send(JSON.stringify(payload==null?{action}:{action,payload:String(payload)}))}
 const K_LABEL={off:'Connect karaoke',connecting:'Connecting…',on:'Connected',retry:'Reconnecting…',error:'Not connected'};
 const K_LABEL_BT={off:'Connect karaoke',connecting:'Connecting…',on:'Connected (BT)',retry:'Connecting…',error:'Not connected'};
-function setK(s){K.state=s;const c=$('conn');c.dataset.s=s;$('conn-t').textContent=(K.link==='bt'?K_LABEL_BT:K_LABEL)[s];renderNP();if(sheetMode==='connect'){if(K.link==='bt')renderBt();else{renderConnectStatus();renderScan()}}}
+function setK(s){K.state=s;const c=$('conn');c.dataset.s=s;$('conn-t').textContent=(K.link==='bt'||K.link==='bts'?K_LABEL_BT:K_LABEL)[s];renderNP();if(sheetMode==='connect'){if(K.link==='bt'||K.link==='bts')renderBt();else{renderConnectStatus();renderScan()}}}
 function renderNP(){
   const np=$('np');const show=CAN_K&&(K.state==='on'||(K.state==='retry'&&K.everOn));np.hidden=!show;if(!show)return;
   let t;if(K.now){t=`<span class="st">${K.status==='paused'?'Paused':'Now playing'}</span><span class="t"><span class="tt">${esc(String(K.now.title||K.now.code))}</span> <small>${esc(String(K.now.artist||''))}</small></span>`}
@@ -648,6 +658,7 @@ const ICON={
   pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
   stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
   next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l8.5 6L6 18zM16 6h2v12h-2z"/></svg>',
+  more:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   bgv:'<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M3 5h18v14H3zm2 2v10h14V7z"/><path d="M6.5 15.5l3.2-4 2.3 2.8 2.2-2.8 3.3 4z"/><circle cx="15.5" cy="9.3" r="1.3"/></svg>'};
 const isPlaying=()=>{const s=String(K.status).toLowerCase();return s!=='idle'&&s!=='paused'&&s!==''&&s!=='stopped'};
 const fmtAdj=v=>v>0?'+'+v:String(v);
@@ -666,7 +677,8 @@ function ctlHTML(){const pl=isPlaying();const on=w=>K.panel===w?' aria-expanded=
    <button type="button" data-tp="stop">${ICON.stop}<span>Stop</span></button>
    <button type="button" data-panel="melody"${on('melody')}><b class="v">${MEL[K.mel]}</b><span>Melody</span></button>
    <button type="button" data-panel="tempo"${on('tempo')}><b class="v">${fmtAdj(K.adj.tempo)}</b><span>Tempo</span></button>
-   <button type="button" data-panel="key"${on('key')}><b class="v">${fmtAdj(K.adj.key)}</b><span>Keys</span></button></div>`}
+   <button type="button" data-panel="key"${on('key')}><b class="v">${fmtAdj(K.adj.key)}</b><span>Keys</span></button>
+   ${K.link==='bt'?'':`<button type="button" data-panel="more"${on('more')}>${ICON.more}<span>More</span></button>`}</div>`}
 function panelHTML(){
   if(K.panel==='tempo'||K.panel==='key'){const n=K.panel,L=n==='key'?'Keys':'Tempo';
     return `<div class="panel gut"><span class="pl">${L}</span>
@@ -674,6 +686,8 @@ function panelHTML(){
       <output id="adj-${n}" aria-live="polite">${fmtAdj(K.adj[n])}</output>
       <button type="button" class="sbtn" data-adj="${n}+" aria-label="${n==='key'?'Key up':'Faster'}">+</button>
       <button type="button" class="pdone" data-panel="">Done</button></div>`}
+  if(K.panel==='more'){
+    return `<div class="panel gut"><span class="pl">More</span><div class="chips">${[['mpxch','MPX'],['projector','PROJ'],['toggle_mode','MODE']].map(a=>`<button type="button" class="chip" data-tp="${a[0]}">${a[1]}</button>`).join('')}</div><button type="button" class="pdone" data-panel="">Done</button></div>`}
   if(K.panel==='melody'){
     return `<div class="panel mel gut"><span class="pl">${K.melFix?'Tap the level SongHub shows now':'Melody'}</span>
       <div class="chips mchips">${MEL.map((m,k)=>`<button type="button" class="chip" data-mel="${k}" aria-pressed="${k===K.mel}">${m}</button>`).join('')}</div>
@@ -692,7 +706,7 @@ function kTransport(what){
     if(what==='pp'){const was=isPlaying();sendOp(0,'');
       if(K.link!=='bt'&&(K.now||was)){K.status=was?'paused':'playing';renderNP();if(sheetMode==='queue')openQueue()}  // flip right away; the next state update confirms
       toast(K.link==='bt'?'Play/Pause':was?'Paused':'Start');}
-    else{sendAct(what,null);toast(what==='next'?'Next song':what==='stop'?'Stopped':what==='bgv'?'Background changed':'Replaying song')}
+    else{sendAct(what,null);toast(({next:'Next song',stop:'Stopped',bgv:'Background changed',mpxch:'Vocal / MPX switched',projector:'Projector toggled',toggle_mode:'Mode changed'})[what]||'Replaying song')}
   }catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.')}
 }
 // Key = binary [4,±1], Tempo = binary [5,±1] — same as SongHub's official remote. Counts are taps since the song started.
@@ -743,7 +757,7 @@ function kSend(kind,i){
   toast(K.link==='bt'?'Sent to SongHub: '+title[i]:kind==='now'?'Playing '+title[i]+'…':kind==='first'?'Reserved first: '+title[i]:'Reserved: '+title[i]);
   closeSheet();
 }
-function saveK(){try{localStorage.setItem('songbook-karaoke',JSON.stringify({host:K.host,port:K.port,link:K.link,bt:K.btAddr,btName:K.btName}))}catch(e){}}
+function saveK(){try{localStorage.setItem('songbook-karaoke',JSON.stringify({host:K.host,port:K.port,link:K.link,bt:K.btAddr,btName:K.btName,btm:K.btMode}))}catch(e){}}
 
 function renderConnectStatus(){const el=$('kstat');if(!el)return;
   const m={off:K.host?'Not connected.':'Enter the address shown in SongHub.',connecting:'Connecting to '+addrText()+'…',on:'Connected to '+addrText()+'.',retry:'Connection lost. Reconnecting to '+addrText()+'…',
@@ -757,9 +771,9 @@ function openConnect(){
   sheetMode='connect';
   sheet.innerHTML=`<div class="card" role="dialog" aria-modal="true" aria-label="Connect to karaoke">
     <div class="lbl">SongHub remote</div><h2>Connect to karaoke</h2>
-    ${NBT?`<div class="seg" role="tablist" aria-label="Connection type"><button type="button" role="tab" data-ctab="wifi" aria-selected="${K.connTab!=='bt'}">Wi-Fi</button><button type="button" role="tab" data-ctab="bt" aria-selected="${K.connTab==='bt'}">Bluetooth keypad</button></div>`:''}
-    <div id="btbox" class="btbox"${K.connTab==='bt'&&NBT?'':' hidden'}></div>
-    <div id="wifibox" class="wifibox"${K.connTab==='bt'&&NBT?' hidden':''}>
+    ${HAS_BT?`<div class="seg" role="tablist" aria-label="Connection type"><button type="button" role="tab" data-ctab="wifi" aria-selected="${K.connTab!=='bt'}">Wi-Fi</button><button type="button" role="tab" data-ctab="bt" aria-selected="${K.connTab==='bt'}">Bluetooth</button></div>`:''}
+    <div id="btbox" class="btbox"${K.connTab==='bt'&&HAS_BT?'':' hidden'}></div>
+    <div id="wifibox" class="wifibox"${K.connTab==='bt'&&HAS_BT?' hidden':''}>
     ${CAN_SCAN?'<div class="scan" id="scanbox"></div>':''}
     <form id="kform" class="field" autocomplete="off"><label for="khost">Address and port</label>
       <input id="khost" inputmode="url" placeholder="192.168.1.18:48080" value="${esc(addrText())}" spellcheck="false" autocapitalize="off"></form>
@@ -769,16 +783,17 @@ function openConnect(){
   sheet.hidden=false;
   const go=()=>{const a=parseAddr($('khost').value);if(!a){$('kstat').dataset.s='error';$('kstat').textContent='Type an address like 192.168.1.18:48080.';return}
     if(K.link==='bt'){try{NBT&&NBT.disconnect()}catch(e){}K.link='wifi';setK('off')}
+    else if(K.link==='bts'){kDisconnect();K.link='wifi'}
     K.host=a.host;K.port=a.port;K.retry=0;K.everOn=false;saveK();$('khost').value=addrText();$('khost').blur();kConnect()};
   $('kform').onsubmit=e=>{e.preventDefault();go()};
   $('kgo').onclick=go;$('kstop').onclick=()=>{kDisconnect()};$('close').onclick=closeSheet;
-  if(NBT){
+  if(HAS_BT){
     sheet.querySelectorAll('[data-ctab]').forEach(b=>b.onclick=()=>{K.connTab=b.dataset.ctab;
       sheet.querySelectorAll('[data-ctab]').forEach(x=>x.setAttribute('aria-selected',x===b));
       $('btbox').hidden=K.connTab!=='bt';$('wifibox').hidden=K.connTab==='bt';
-      if(K.connTab==='bt'){try{NBT.start('')}catch(e){}renderBt()}});
+      if(K.connTab==='bt'){try{NBT&&NBT.start('')}catch(e){}renderBt()}});
     $('btbox').onclick=btClick;
-    if(K.connTab==='bt'){try{NBT.start(K.link==='bt'?K.btAddr:'')}catch(e){}renderBt()}
+    if(K.connTab==='bt'){try{NBT&&NBT.start(K.link==='bt'?K.btAddr:'')}catch(e){}renderBt()}
   }
   renderConnectStatus();
   if(CAN_SCAN){
@@ -807,31 +822,45 @@ const BT_MSG={off:'Bluetooth keypad is off.',permission:'Allow Songbook to use B
 function btDevices(){let l=[];try{l=JSON.parse(NBT.devices())||[]}catch(e){}
   const rank=m=>m===0x200?0:m===0x100?1:m===0x400?2:3;   // phones, then computers/TV boxes, then audio, then others
   return l.sort((a,b)=>rank(a.major)-rank(b.major)||String(a.name).localeCompare(String(b.name)))}
-function renderBt(){const box=$('btbox');if(!box||!NBT)return;
-  const b=K.bt,on=K.link==='bt'&&b.state==='connected';
-  const devs=btDevices();
-  const msg=b.state==='error'?b.error:b.state==='connected'?'Connected to '+(b.name||'karaoke device')+' as a Bluetooth keypad.':BT_MSG[b.state]||'';
-  let phone='';try{phone=NBT.phoneName()}catch(e){}
-  box.innerHTML=`<div class="kstat" data-s="${on?'on':b.state==='error'?'error':''}" role="status">${esc(msg)}</div>
+function renderBt(){const box=$('btbox');if(!box||!HAS_BT)return;
+  const rf=K.btMode==='rf'&&!!NBR;
+  const b=K.bt;
+  const on=rf?(K.link==='bts'&&K.state==='on'):(K.link==='bt'&&b.state==='connected');
+  const devs=NBT?btDevices():[];
+  let msg;
+  if(rf)msg=K.link==='bts'?({on:'Connected to '+(K.btName||'SongHub')+'.',connecting:'Connecting to '+(K.btName||'SongHub')+'…',retry:'Connection lost. Reconnecting…',error:'Could not connect. '+(K.lastErr||'')}[K.state]||'Tap your SongHub device below.'):'Tap your SongHub device below.';
+  else msg=b.state==='error'?b.error:b.state==='connected'?'Connected to '+(b.name||'karaoke device')+' as a Bluetooth keypad.':BT_MSG[b.state]||'';
+  let phone='';try{phone=NBT?NBT.phoneName():''}catch(e){}
+  const seg=NBR&&NBT?`<div class="seg" role="tablist" aria-label="Bluetooth mode"><button type="button" role="tab" data-bmode="rf" aria-selected="${rf}">SongHub 5 remote</button><button type="button" role="tab" data-bmode="hid" aria-selected="${!rf}">Keyboard</button></div>`:'';
+  box.innerHTML=`${seg}<div class="kstat" data-s="${on?'on':(rf?K.link==='bts'&&K.state==='error':b.state==='error')?'error':''}" role="status">${esc(msg)}</div>
     <div class="scan">
       <div class="shead"><span class="sst">Paired devices</span><button type="button" class="sbtn2" data-bt="refresh">Refresh</button></div>
-      ${devs.length?devs.map(d=>{const cur=on&&d.addr===b.addr,busy=b.state==='connecting'&&d.addr===K.btAddr;
+      ${devs.length?devs.map(d=>{const cur=on&&d.addr===(rf?K.btAddr:b.addr),busy=rf?(K.link==='bts'&&K.state==='connecting'&&d.addr===K.btAddr):(b.state==='connecting'&&d.addr===K.btAddr);
         return `<button type="button" class="pick${cur?' on':''}" data-btpick="${esc(d.addr)}" data-btname="${esc(d.name)}"><span class="pn">${esc(d.name||'Unnamed device')}</span><span class="pa">${esc(d.addr)}</span><span class="pgo">${cur?'Connected':busy?'Connecting…':'Connect'}</span></button>`}).join('')
         :'<p class="help">No paired devices yet.</p>'}
     </div>
-    <div class="acts"><button type="button" class="primary" data-bt="pair">Pair a new device</button>${on?'<button type="button" data-bt="disc">Disconnect</button>':''}<button type="button" id="close2">Close</button></div>
-    <p class="help"><b>To pair:</b> tap <b>Pair a new device</b> and allow. On the karaoke device, open <b>Bluetooth</b> settings and pair with <b>${esc(phone||'this phone')}</b>. It shows up as a keyboard. Then tap it in the list above.<br>
-    Keep SongHub's player screen open. Over Bluetooth you can Reserve, use the keypad, Play/Pause, Stop, Next, Keys, Tempo and Melody. The queue, now playing, Reserve 1st and Play now need Wi-Fi.</p>`;
+    <div class="acts">${rf?'':'<button type="button" class="primary" data-bt="pair">Pair a new device</button>'}${on?'<button type="button" data-bt="disc">Disconnect</button>':''}<button type="button" id="close2">Close</button></div>
+    ${rf?`<p class="help"><b>SongHub 5 remote:</b> needs SongHub for Android 5.xx or SongHub PC 2.xx. In SongHub, turn on its <b>Bluetooth remote</b>, pair this phone with the SongHub device in Android's Bluetooth settings, then tap it above. You get everything the Wi-Fi remote has: the queue, now playing, Reserve 1st, Play now and all the controls.</p>`
+    :`<p class="help"><b>To pair:</b> tap <b>Pair a new device</b> and allow. On the karaoke device, open <b>Bluetooth</b> settings and pair with <b>${esc(phone||'this phone')}</b>. It shows up as a keyboard. Then tap it in the list above.<br>
+    Keep SongHub's player screen open. Over Bluetooth you can Reserve, use the keypad, Play/Pause, Stop, Next, Keys, Tempo and Melody. The queue, now playing, Reserve 1st and Play now need Wi-Fi.</p>`}`;
 }
 function btClick(e){
+  const bm=e.target.closest('[data-bmode]');
+  if(bm){K.btMode=bm.dataset.bmode==='hid'?'hid':'rf';saveK();renderBt();return}
+  const rf=K.btMode==='rf'&&!!NBR;
   const pk=e.target.closest('[data-btpick]');
-  if(pk){if(K.link!=='bt'){kDisconnect();K.link='bt'}K.btAddr=pk.dataset.btpick;K.btName=pk.dataset.btname;saveK();
+  if(pk){
+    if(rf){
+      if(K.link==='bt'){try{NBT&&NBT.disconnect()}catch(err){}}
+      kDisconnect();K.link='bts';K.btAddr=pk.dataset.btpick;K.btName=pk.dataset.btname;K.retry=0;K.everOn=false;K.lastErr='';saveK();
+      kConnect();renderBt();return}
+    if(K.link!=='bt'){kDisconnect();K.link='bt'}K.btAddr=pk.dataset.btpick;K.btName=pk.dataset.btname;saveK();
     K.bt.state='connecting';setK('connecting');try{NBT.connect(K.btAddr)}catch(err){}renderBt();return}
   const a=e.target.closest('[data-bt]');
   if(a){const w=a.dataset.bt;
     if(w==='refresh')renderBt();
     else if(w==='pair'){try{NBT.start('');NBT.discoverable()}catch(err){}toast('Now pair from the karaoke device\'s Bluetooth settings',3500)}
-    else if(w==='disc'){try{NBT.disconnect()}catch(err){}}
+    else if(w==='disc'){if(K.link==='bts'){kDisconnect();renderBt()}else{try{NBT.disconnect()}catch(err){}}}
     return}
   if(e.target.closest('#close2'))closeSheet();
 }
@@ -881,6 +910,7 @@ if(CAN_K){
   $('conn').onclick=()=>K.state==='on'?openQueue():openConnect();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&K.wanted&&!kOpen()){K.retry=0;kConnect()}});
   if(K.link==='bt'&&NBT){try{NBT.start(K.btAddr||'')}catch(e){}}
+  else if(K.link==='bts'&&NBR&&K.btAddr){kConnect()}
   else{K.link='wifi';if(K.host)kConnect()}
 }
 
@@ -1061,7 +1091,8 @@ function autoCheckUpdate(){
   if(Date.now()-last<6*3600*1000)return;   // at most every 6 hours
   checkUpdate(false);
 }
-function closeSheet(){sheet.hidden=true;sheet.innerHTML='';sheetMode='';clearTimeout(kpTimer)}
+function closeSheet(){if(sheetMode==='keypad'&&kpDigits&&K.link!=='bt'&&kOpen()){try{wsRaw([13])}catch(e){}}
+  sheet.hidden=true;sheet.innerHTML='';sheetMode='';clearTimeout(kpTimer)}
 
 /* ---------- number keypad ---------- */
 let kpDigits='';
@@ -1103,6 +1134,7 @@ function kpRender(){
 // SongHub forgets a typed number 5 s after the last key, so Reserve retypes it after a pause.
 let kpLive=false,kpLastT=0,kpTimer=0,kpCleared=false;
 const kpBtLive=()=>K.link==='bt'&&kOpen();
+const kpWsLive=()=>K.link!=='bt'&&kOpen();   // Wi-Fi / Bluetooth remote: SongHub 5.x shows the number as you type
 // mirror SongHub: it forgets the typed number 5 s after the last key, so the keypad here clears too
 function kpArmTimeout(){clearTimeout(kpTimer);if(!kpDigits)return;
   kpTimer=setTimeout(()=>{if(sheetMode==='keypad'&&K.link==='bt'&&kpLive&&kpDigits){kpDigits='';kpLive=false;kpCleared=true;kpRender()}},5000)}
@@ -1111,6 +1143,7 @@ function kpPress(k){
   if(k==='clr')kpDigits='';else if(k==='del')kpDigits=kpDigits.slice(0,-1);
   else if(kpDigits.length<6)kpDigits+=k;
   kpCleared=false;
+  if(kpWsLive()&&kpDigits!==before){try{if(k==='clr')wsRaw([13]);else if(k==='del')wsRaw([12]);else sendInt(11,+k)}catch(e){}}
   if(kpBtLive()&&kpDigits!==before){
     try{
       if(k==='clr')btKeys(Array(Math.max(before.length,1)).fill('bksp'));
@@ -1131,13 +1164,13 @@ function kpAction(a){
   if(!kpDigits)return;
   if(!kOpen()){toast('Not connected to the karaoke');openConnect();return}
   const code=i>=0?num[i]:kpCode(),name=i>=0?title[i]:'song '+code;
-  try{if(a==='now')sendOp(1,code);else if(a==='first')sendAct('priority',code);
+  try{if(a==='now')sendOp(1,code);else if(a==='first'){sendAct('priority',code);if(kpWsLive())wsRaw([13])}
     else if(kpBtLive()&&kpLive&&Date.now()-kpLastT<4500)btKeys(['enter']);   // number is already on SongHub's screen
     else sendOp(2,code)}catch(e){toast(e===BT_ONLY?'Not available over Bluetooth':'Could not send. Check the connection.');return}
   K.pending={kind:a,code,title:name,at:Date.now()};addHistory(code,a);
   toast(K.link==='bt'?'Sent to SongHub: '+name:a==='now'?'Playing '+name+'…':a==='first'?'Reserved first: '+name:'Reserved: '+name);
   kpLive=false;clearTimeout(kpTimer);
-  if(a==='now')closeSheet();else{kpDigits='';kpRender()}   // ready for the next number
+  kpDigits='';if(a==='now')closeSheet();else kpRender()   // ready for the next number
 }
 $('kpbtn').onclick=()=>{kpDigits='';kpLive=false;kpCleared=false;clearTimeout(kpTimer);openKeypad()};
 sheet.addEventListener('click',e=>{if(sheetMode!=='keypad')return;

@@ -7,4 +7,5 @@ public class BluetoothAdapter {
   public void closeProfileProxy(int p, BluetoothProfile proxy){throw new RuntimeException();}
   public BluetoothDevice getRemoteDevice(String a){throw new RuntimeException();}
   public String getName(){throw new RuntimeException();}
+  public boolean cancelDiscovery(){throw new RuntimeException();}
 }

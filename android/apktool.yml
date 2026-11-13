@@ -12,8 +12,8 @@ packageInfo:
   forcedPackageId: 127
   renameManifestPackage: null
 versionInfo:
-  versionCode: 26
-  versionName: 3.4
+  versionCode: 27
+  versionName: 3.5
 resourcesAreCompressed: false
 sharedLibrary: false
 sparseResources: false
